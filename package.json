@@ -7,13 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test src/**/*.test.ts"
+    "test": "node --import tsx --test src/**/*.test.ts",
+    "stage1": "node --env-file=.env.local --import tsx scripts/runStage1.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
     "next": "16.3.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "^3.25.76"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^20",

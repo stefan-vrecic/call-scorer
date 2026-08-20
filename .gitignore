@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# scratch output from dev CLI scripts (stage1, stage2, ...) - regenerate anytime, not a deliverable
+/dev-output/
