@@ -34,6 +34,13 @@ export interface ReportDimension {
   disabledReason?: string;
   /** id of the AutomaticCap that constrained this specific dimension's score, if any. */
   cappedBy?: string;
+  /**
+   * Set only when Stage 2's raw score didn't fall within any real band for
+   * this dimension and had to be clamped (see scoring/scoreValidation.ts) -
+   * `score` above is already the clamped value; this records that an
+   * adjustment happened and why, the same visibility principle as cappedBy.
+   */
+  scoreClampReason?: string;
 }
 
 export interface OneThing {
@@ -61,7 +68,10 @@ export interface Report {
   /** 100, or 85 for a coaching call with D4 disabled. */
   maxPossible: number;
   band: string;
-  oneThing: OneThing;
+  /** null only when every scored dimension is already at its max - nothing left to recommend. */
+  oneThing: OneThing | null;
+  /** True when Phase 3's evidence validator crossed the warn (not fail) threshold - visible to a reviewer, doesn't block the report. */
+  evidenceWarning: boolean;
   brief: string;
   redFlags: string[];
   generatedAt: string;

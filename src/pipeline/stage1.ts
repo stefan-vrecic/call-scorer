@@ -21,6 +21,7 @@ import type { CallType, RubricContract } from "@/types/rubric";
 import { Stage1OutputSchema, type Stage1Output } from "@/types/evaluation";
 import { indexTranscript, type IndexedTranscript } from "@/lib/transcript";
 import { buildStage1SystemPrompt } from "./stage1Prompt";
+import { callToolWithRetry } from "./toolCall";
 import { MODEL, STAGE1_MAX_TOKENS } from "@/config";
 
 export interface Stage1Result {
@@ -102,33 +103,25 @@ export async function runStage1(callType: CallType, transcript: string): Promise
   const system = buildStage1SystemPrompt(rubric);
 
   const client = new Anthropic();
-  const response = await client.messages.create({
-    model: MODEL,
-    max_tokens: STAGE1_MAX_TOKENS,
-    system,
-    messages: [{ role: "user", content: indexed.indexedText }],
-    tools: [
-      {
-        name: TOOL_NAME,
-        description: "Report the Stage 1 evidence extraction result for this call.",
-        input_schema: buildEvidenceToolInputSchema(rubric) as unknown as Anthropic.Tool.InputSchema,
-      },
-    ],
-    tool_choice: { type: "tool", name: TOOL_NAME },
+  const output = await callToolWithRetry({
+    client,
+    request: {
+      model: MODEL,
+      max_tokens: STAGE1_MAX_TOKENS,
+      system,
+      messages: [{ role: "user", content: indexed.indexedText }],
+      tools: [
+        {
+          name: TOOL_NAME,
+          description: "Report the Stage 1 evidence extraction result for this call.",
+          input_schema: buildEvidenceToolInputSchema(rubric) as unknown as Anthropic.Tool.InputSchema,
+        },
+      ],
+      tool_choice: { type: "tool", name: TOOL_NAME },
+    },
+    toolName: TOOL_NAME,
+    schema: Stage1OutputSchema,
   });
 
-  const toolUse = response.content.find(
-    (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
-  );
-
-  if (!toolUse) {
-    throw new Error(`Stage 1: expected a ${TOOL_NAME} tool call, got stop_reason=${response.stop_reason}`);
-  }
-
-  const parsed = Stage1OutputSchema.safeParse(toolUse.input);
-  if (!parsed.success) {
-    throw new Error(`Stage 1: tool input did not match Stage1OutputSchema - ${parsed.error.message}`);
-  }
-
-  return { output: parsed.data, indexed };
+  return { output, indexed };
 }

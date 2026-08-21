@@ -41,6 +41,28 @@ test("kickoff: no-North-Star cap clamps D4 to 10 even though Stage 2 scored it 1
   assert.deepEqual(result.appliedCaps.map((c) => c.id), ["no-north-star"]);
 });
 
+test("kickoff: a fired maxDimension cap that doesn't actually bind (score already below the ceiling) is listed in appliedCaps but NOT recorded as cappedBy on the dimension", () => {
+  // Found via a real pipeline run: D4 raw-scored 5 by Stage 2 (already below
+  // the no-North-Star cap's ceiling of 10). The cap's condition IS true, so
+  // it belongs in appliedCaps - but reporting cappedBy on D4 too would
+  // falsely tell a coach they lost points to this rule when the score would
+  // have been identical without it.
+  const input: ApplyRubricRulesInput = {
+    callType: "kickoff",
+    dimensionScores: { D1: 8, D2: 7, D3: 3.5, D4: 5, D5: 7, D6: 7, D7: 5, D8: 7, D9: 10, D10: 1, D11: 3, D12: 4.5 },
+    signals: {
+      noFollowUpQuestionsAnywhere: false,
+      coachDominatesWithoutEngagement: false,
+      clientUnresolvedConfusion: false,
+      noNorthStarStatement: true,
+    },
+  };
+  const result = applyRubricRules(input);
+  assert.equal(result.cappedScores.D4, 5); // unchanged - 5 was already below the cap's ceiling of 10
+  assert.deepEqual(result.appliedCaps.map((c) => c.id), ["no-north-star"]); // condition still true, still listed
+  assert.equal(result.cappedDimensionIds.D4, undefined); // but NOT flagged as capped on the dimension itself
+});
+
 test("kickoff: no-follow-up-questions maxTotal cap holds the total at 70 despite a higher raw sum", () => {
   // Sum: 9+7+4.5+10+8+7+5+7+7+4.5+5+4.5 = 78.5 -> capped to 70.
   const input: ApplyRubricRulesInput = {

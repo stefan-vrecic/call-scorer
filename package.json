@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "node --import tsx --test src/**/*.test.ts",
     "stage1": "node --env-file=.env.local --import tsx scripts/runStage1.ts",
-    "validate": "node --import tsx scripts/runValidator.ts"
+    "validate": "node --import tsx scripts/runValidator.ts",
+    "pipeline": "node --env-file=.env.local --import tsx scripts/runPipeline.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

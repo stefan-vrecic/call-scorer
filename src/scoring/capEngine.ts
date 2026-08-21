@@ -59,10 +59,17 @@ export function applyCaps(
       case "maxDimension": {
         const { dimensionId, value } = cap.effect;
         if (cappedScores[dimensionId] === undefined) break;
+        // Only record cappedDimensionIds when the ceiling actually bound - a
+        // dimension Stage 2 already scored below the cap's value wasn't
+        // "capped" in any meaningful sense, even though the cap's underlying
+        // condition (recorded unconditionally in appliedCaps above) is true.
+        // Reporting cappedBy here regardless would tell a coach they lost
+        // points to this rule when the score would have been identical
+        // without it.
         if (cappedScores[dimensionId] > value) {
           cappedScores[dimensionId] = value;
+          cappedDimensionIds[dimensionId] = cappedDimensionIds[dimensionId] ?? cap.id;
         }
-        cappedDimensionIds[dimensionId] = cappedDimensionIds[dimensionId] ?? cap.id;
         break;
       }
       case "zeroDimension": {

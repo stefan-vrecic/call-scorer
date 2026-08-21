@@ -32,6 +32,8 @@ export interface EvidenceValidationResult {
 
 export interface DimensionValidationResult {
   dimensionId: string;
+  /** Passed through from Stage 1 - Stage 2 wants this alongside the validated evidence, and they're already zipped together here. */
+  observedBehaviour: string;
   results: EvidenceValidationResult[];
   /** Only the evidence items that passed - this is what Stage 2 is allowed to see. */
   validEvidence: Evidence[];
@@ -114,6 +116,7 @@ function validateDimension(
 
   return {
     dimensionId: dimension.dimensionId,
+    observedBehaviour: dimension.observedBehaviour,
     results,
     validEvidence,
     insufficientEvidence: dimension.insufficientEvidence || allEvidenceRejected,
