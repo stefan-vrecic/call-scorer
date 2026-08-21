@@ -10,6 +10,12 @@ create table if not exists runs (
   id uuid primary key default gen_random_uuid(),
   call_type text not null check (call_type in ('kickoff', 'coaching')),
   transcript text not null,
+  -- sha256 of (call_type, transcript) - see src/lib/transcriptHash.ts. Lets
+  -- the create-run flow check for an exact-duplicate submission (accidental
+  -- double-click, literal re-paste) before spending ~$0.10 and ~60-90s
+  -- re-running the pipeline on identical input. Not fuzzy/near-duplicate
+  -- matching - only a byte-identical transcript hashes the same.
+  transcript_hash text not null,
   status text not null default 'pending'
     check (status in ('pending', 'running', 'complete', 'failed')),
   error text,
@@ -18,6 +24,8 @@ create table if not exists runs (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create index if not exists runs_transcript_hash_idx on runs (transcript_hash);
 
 alter table runs enable row level security;
 -- Deliberately no policies: RLS on + zero policies = the table is invisible
