@@ -50,7 +50,8 @@ export function buildStage1SystemPrompt(rubric: RubricContract): string {
 The transcript has been split into numbered lines, one per speaking turn, formatted as "[NNN] [Speaker]: what they said". This is a ${rubric.callType} call.
 
 EVIDENCE RULES - read carefully, these are the most important instructions in this prompt:
-- Every piece of evidence you cite MUST give the EXACT line number it came from and an EXACT, verbatim substring of that line's own text (not the [NNN] prefix, not the speaker tag - just the spoken words). Do not paraphrase a quote. Do not combine text from two different lines into one quote. Do not invent a line number.
+- Every piece of evidence you cite MUST give the EXACT line number it came from and an EXACT, verbatim, CONTINUOUS substring of that line's own text (not the [NNN] prefix, not the speaker tag - just the spoken words). Do not paraphrase a quote. Do not combine text from two different lines into one quote. Do not invent a line number.
+- A quote must be a single unbroken excerpt - never join two separate parts of the same line with "..." or any other ellipsis/joiner, even if both parts are real and from that exact line. A line's speaker often says several separate things worth citing - if two different parts of one line are both worth citing, report them as two separate {line, quote} entries in the evidence array (same line number, two entries), not one quote that skips the middle.
 - If the transcript does not contain enough to judge a dimension, set insufficientEvidence to true for that dimension and leave evidence sparse or empty. Never invent evidence to avoid an empty result. A dimension with no real evidence in the transcript should look like an honest "not enough here" - not a fabricated observation.
 - observedBehaviour is a plain description of what happened (or didn't) - not a score, not a verdict, not band language like "Elite" or "Strong".
 
