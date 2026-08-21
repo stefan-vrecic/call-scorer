@@ -11,6 +11,23 @@
 import type { CallType, CapEffect } from "./rubric";
 import type { Evidence } from "./evaluation";
 
+/**
+ * Records a case where pipeline/signalConsistency.ts overrode a call-level
+ * signal because it contradicted its paired dimension's own validated
+ * evidence - see that file for why this exists and which pairings are safe.
+ * Kept as its own visible Report field (not folded into the narrative brief)
+ * for the same reason cappedBy/scoreClampReason are explicit fields: a
+ * reviewer opening the run should be able to see exactly what was corrected
+ * and why, not just read a sentence about it.
+ */
+export interface SignalCorrection {
+  signal: string;
+  dimensionId: string;
+  reportedValue: boolean;
+  correctedValue: boolean;
+  reason: string;
+}
+
 export interface AppliedCap {
   id: string;
   /** The rubric's own human-readable condition text, for the report/PDF to display. */
@@ -72,6 +89,8 @@ export interface Report {
   oneThing: OneThing | null;
   /** True when Phase 3's evidence validator crossed the warn (not fail) threshold - visible to a reviewer, doesn't block the report. */
   evidenceWarning: boolean;
+  /** Empty when Stage 1's signals were internally consistent - see pipeline/signalConsistency.ts. */
+  signalCorrections: SignalCorrection[];
   brief: string;
   redFlags: string[];
   generatedAt: string;

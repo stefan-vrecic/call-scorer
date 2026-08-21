@@ -13,6 +13,9 @@ export const STAGE1_MAX_TOKENS = 8000;
 /** Scores + reasoning + quickFix for up to 12 dimensions - flatter than Stage 1's output, smaller budget is plenty. */
 export const STAGE2_MAX_TOKENS = 6000;
 
+/** A short brief + a handful of red-flag strings + one explanation sentence - the smallest output of the three calls. */
+export const SYNTHESIS_MAX_TOKENS = 2000;
+
 /**
  * Evidence-validation thresholds (Phase 3). PROVISIONAL - reasoned defaults,
  * not yet calibrated against a large sample of real invalid-citation data.

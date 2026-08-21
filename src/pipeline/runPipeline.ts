@@ -1,10 +1,9 @@
 /**
- * Orchestrates the full deterministic scoring path: transcript -> Stage 1 ->
- * validate -> Stage 2 (on validated evidence only) -> score-validate/clamp ->
- * applyRubricRules -> oneThing. Returns everything a Report needs except
- * brief/redFlags, which Phase 5's synthesis call fills in - this function
- * doesn't change shape when that's added, it just gets one more step
- * appended after it.
+ * Orchestrates the full pipeline: transcript -> Stage 1 -> validate ->
+ * Stage 2 (on validated evidence only) -> score-validate/clamp ->
+ * applyRubricRules -> oneThing (all deterministic) -> synthesis (brief,
+ * redFlags, oneThingExplanation - strictly downstream, see synthesis.ts).
+ * Returns a complete Report.
  */
 
 import { kickoffRubric } from "@/rubrics/kickoff";
@@ -13,20 +12,20 @@ import type { CallType } from "@/types/rubric";
 import { runStage1 } from "./stage1";
 import { validateStage1Output, type Stage1ValidationResult } from "./evidenceValidator";
 import { runStage2 } from "./stage2";
+import { checkSignalConsistency } from "./signalConsistency";
 import { validateDimensionScore } from "@/scoring/scoreValidation";
 import { applyRubricRules } from "@/scoring/applyRubricRules";
 import { computeOneThing } from "@/scoring/oneThing";
+import { runSynthesis, type OneThingCandidate } from "./synthesis";
 import { MODEL } from "@/config";
 import type { Report, ReportDimension } from "@/types/report";
 
-export type PartialReport = Omit<Report, "brief" | "redFlags">;
-
-function getDisabledDimensionIds(callType: CallType, validation: Stage1ValidationResult): string[] {
+function getDisabledDimensionIds(callType: CallType, signals: Stage1ValidationResult["signals"]): string[] {
   if (callType !== "coaching") return [];
-  return validation.signals.movementCoachingDisabled ? ["D4"] : [];
+  return signals.movementCoachingDisabled ? ["D4"] : [];
 }
 
-export async function runScoringPipeline(callType: CallType, transcript: string): Promise<PartialReport> {
+export async function runScoringPipeline(callType: CallType, transcript: string): Promise<Report> {
   const rubric = callType === "kickoff" ? kickoffRubric : coachingRubric;
 
   const { output: stage1Output, indexed } = await runStage1(callType, transcript);
@@ -38,7 +37,16 @@ export async function runScoringPipeline(callType: CallType, transcript: string)
     );
   }
 
-  const disabledDimensionIds = getDisabledDimensionIds(callType, validation);
+  // Corrects any call-level signal that contradicts its paired dimension's own
+  // validated evidence (see signalConsistency.ts) - runs before the signals are
+  // used for anything downstream (disabled-dimension check, caps, oneThing).
+  const { correctedSignals, corrections: signalCorrections } = checkSignalConsistency(
+    callType,
+    validation.signals,
+    validation.dimensions,
+  );
+
+  const disabledDimensionIds = getDisabledDimensionIds(callType, correctedSignals);
   const scoredDimensions = validation.dimensions.filter((d) => !disabledDimensionIds.includes(d.dimensionId));
 
   const stage2Output = await runStage2(callType, scoredDimensions, disabledDimensionIds);
@@ -63,7 +71,7 @@ export async function runScoringPipeline(callType: CallType, transcript: string)
   const rulesInput = {
     callType,
     dimensionScores,
-    signals: validation.signals,
+    signals: correctedSignals,
     disabledDimensionIds,
   };
 
@@ -108,6 +116,32 @@ export async function runScoringPipeline(callType: CallType, transcript: string)
     };
   });
 
+  const oneThingCandidate: OneThingCandidate | null = topCandidate
+    ? {
+        dimensionId: topCandidate.dimensionId,
+        dimensionName: topCandidate.dimensionName,
+        currentScore: topCandidate.currentScore,
+        potentialScore: topCandidate.potentialScore,
+        currentTotal: topCandidate.currentTotal,
+        potentialTotal: topCandidate.potentialTotal,
+        potentialBand: topCandidate.potentialBand,
+      }
+    : null;
+
+  // Everything above this point is final - synthesis only writes prose describing it
+  // (see synthesis.ts's docstring for why it can't alter any of it).
+  const synthesis = await runSynthesis({
+    callType,
+    dimensions,
+    rawTotal: ruleResult.rawTotal,
+    total: ruleResult.total,
+    maxPossible: ruleResult.maxPossible,
+    band: ruleResult.band,
+    appliedCaps: ruleResult.appliedCaps,
+    oneThingCandidate,
+    signalCorrections,
+  });
+
   return {
     callType,
     model: MODEL,
@@ -117,21 +151,17 @@ export async function runScoringPipeline(callType: CallType, transcript: string)
     total: ruleResult.total,
     maxPossible: ruleResult.maxPossible,
     band: ruleResult.band,
-    oneThing: topCandidate
+    oneThing: oneThingCandidate
       ? {
-          dimensionId: topCandidate.dimensionId,
-          dimensionName: topCandidate.dimensionName,
-          currentScore: topCandidate.currentScore,
-          potentialScore: topCandidate.potentialScore,
-          currentTotal: topCandidate.currentTotal,
-          potentialTotal: topCandidate.potentialTotal,
-          potentialBand: topCandidate.potentialBand,
-          // Interim, deterministic explanation until Phase 5's synthesis call writes a real one -
-          // the dimension's own quickFix is already a true, grounded answer to "what needed to change."
-          explanation: stage2ByDimension.get(topCandidate.dimensionId)?.quickFix ?? "",
+          ...oneThingCandidate,
+          // Written by synthesis, grounded in the same final numbers above - never the dimension's own quickFix verbatim.
+          explanation: synthesis.oneThingExplanation ?? "",
         }
       : null,
     evidenceWarning: validation.summary.warning,
+    signalCorrections,
+    brief: synthesis.brief,
+    redFlags: synthesis.redFlags,
     generatedAt: new Date().toISOString(),
   };
 }

@@ -97,9 +97,22 @@ export const Stage2OutputSchema = z.object({
 });
 export type Stage2Output = z.infer<typeof Stage2OutputSchema>;
 
-/** Synthesis call output (Phase 5) - built from Stage 2's structured output, not the raw transcript. */
+/**
+ * Synthesis call output (Phase 5) - built from Stage 2's already-validated,
+ * already-scored structured output, not the raw transcript and not a fresh
+ * read of the evidence. This call is strictly downstream of the deterministic
+ * logic: it doesn't choose, score, cap, or reinterpret anything - it only
+ * writes prose describing results that are already final by the time it runs.
+ */
 export const SynthesisOutputSchema = z.object({
   brief: z.string(),
   redFlags: z.array(z.string()),
+  /**
+   * Explains the already-selected oneThing candidate (see scoring/oneThing.ts) -
+   * optional because oneThing can legitimately be null (every scored dimension
+   * already at max), in which case there's nothing to explain and this field
+   * is omitted from the tool call entirely (see synthesis.ts's dynamic schema).
+   */
+  oneThingExplanation: z.string().optional(),
 });
 export type SynthesisOutput = z.infer<typeof SynthesisOutputSchema>;

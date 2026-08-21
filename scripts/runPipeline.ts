@@ -1,8 +1,7 @@
 /**
  * Runs the full scoring pipeline (Stage 1 -> validate -> Stage 2 -> score-
- * validate -> deterministic rules -> one thing) end to end against one real
- * transcript. First time in the project a transcript goes all the way to an
- * actual total + band. Missing only brief/redFlags (Phase 5).
+ * validate -> deterministic rules -> one thing -> synthesis) end to end
+ * against one real transcript. Produces a complete Report.
  *
  * Usage: npm run pipeline -- <kickoff|coaching> <path-to-transcript.txt>
  */
@@ -35,6 +34,9 @@ async function main() {
   console.error(
     `One thing: ${report.oneThing ? `${report.oneThing.dimensionId} (${report.oneThing.currentScore} -> ${report.oneThing.potentialScore}, total ${report.oneThing.currentTotal.toFixed(1)} -> ${report.oneThing.potentialTotal.toFixed(1)}, band -> ${report.oneThing.potentialBand})` : "none - every dimension already maxed"}`,
   );
+  if (report.oneThing) console.error(`  explanation: ${report.oneThing.explanation}`);
+  console.error(`Brief: ${report.brief}`);
+  console.error(`Red flags: ${report.redFlags.length > 0 ? report.redFlags.join(" | ") : "(none)"}`);
 
   const outDir = join(process.cwd(), "dev-output");
   mkdirSync(outDir, { recursive: true });
