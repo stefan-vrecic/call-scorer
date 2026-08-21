@@ -2,6 +2,15 @@
 
 Logged as they happen, phase by phase, so nothing has to be reconstructed from memory later.
 
+### Loom quick reference - strongest stories to tell, jump to the full writeup
+
+- **A documented approach didn't work, and here's the investigation, not just the pivot.** Anthropic's own recommended structured-output mechanism (`output_config.format`) reliably failed server-side on this schema. Tried it, hit a 400, reproduced it a second time to rule out a fluke, then switched to a forced tool call + client-side Zod validation instead - and can explain *why* that's not a downgrade. → Phase 2, bullet 1.
+- **A real bug the test fixtures caught before it shipped**, not after: "the one thing" simulator was comparing a dimension's raw Stage-2 score against its max instead of the capped/reported score - would have hidden the single highest-leverage fix on a call. → Phase 1 commit / conversation, the `computeOneThing` currentScore fix.
+- **Found and fixed a real inconsistency in the client's own rubric document** (coaching's 12 dimensions sum to 105, not the 100 its own scope note claims) - a concrete example of not treating a source spec as gospel, deriving the correct behavior instead of guessing which number was right. → Phase 1, bullet 1.
+- **A full failure-mode spec for evidence validation, decided in writing before any code**, specifically including the tempting shortcut *not* taken: a real quote cited at the wrong line does NOT get silently relocated to wherever it actually matches, because that would mean the pipeline fixing the model's own citation error instead of catching it. → Phase 3, bullet 1.
+- **Used the evidence validator to root-cause a real failure instead of loosening the validator to pass it.** One transcript tripped the fail threshold; all 8 invalid citations traced to one exact pattern (the model ellipsis-joining two real-but-separate parts of a long line); fixed the prompt at the source, regenerated, watched the invalid rate fall from 21.6% to 0% on that transcript and 7.9%→2.1% in aggregate. Real before/after numbers, not a claimed fix. → Phase 3, bullets 5-7.
+- **A reasoned, asymmetric threshold policy, argued through instead of picked arbitrarily** - warn cheaply and sensitively (doesn't stop anything), fail conservatively and only on both a rate AND an absolute-count floor (stops the run, so it needs to resist small-sample noise). → Phase 3, bullet 3.
+
 ### Phase 1 - rubric contracts + deterministic scoring
 
 - **Coaching rubric point-total discrepancy.** The coaching rubric's own scope note claims totals of 100 (D4 active) / 85 (D4 disabled), but its 12 dimensions' own stated point values sum to 105 - verified against the source file directly, not a transcription error. 105 minus D4's 15 is 90, not 85 either. Resolved by deriving `maxPossible` from the sum of the dimensions actually being scored, rather than trusting the rubric's stated totals - so a perfect call always lands at exactly 100/100, and the D4-disabled denominator is a derived 90, not the rubric's stated 85. See `src/rubrics/coaching.ts` and `src/scoring/applyRubricRules.ts`.
