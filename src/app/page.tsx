@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { MAX_TRANSCRIPT_LENGTH } from "@/config";
 
@@ -12,8 +12,40 @@ export default function Home() {
   const router = useRouter();
   const [callType, setCallType] = useState<CallType>("kickoff");
   const [transcript, setTranscript] = useState("");
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reads the file as text client-side and drops it straight into the same
+  // `transcript` state the textarea already uses - a file is just a second
+  // way to fill that one field, not a separate code path/upload endpoint.
+  // No server involved (nothing is ever "uploaded" - the eventual POST body
+  // is identical whether the text came from typing, pasting, or a file).
+  function loadFile(file: File) {
+    setError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setTranscript(typeof reader.result === "string" ? reader.result : "");
+      setFileName(file.name);
+    };
+    reader.onerror = () => setError(`Couldn't read "${file.name}" as text.`);
+    reader.readAsText(file);
+  }
+
+  function handleFileInputChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) loadFile(file);
+    e.target.value = ""; // allow re-selecting the same file later
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) loadFile(file);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -38,7 +70,7 @@ export default function Home() {
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "3rem 1.5rem", fontFamily: "system-ui, sans-serif" }}>
       <h1>Call Scorer</h1>
-      <p>Paste a kickoff or coaching call transcript below. It gets scored against the client&apos;s rubric, and you get a shareable link to the result.</p>
+      <p>Paste, drop, or open a kickoff or coaching call transcript below. It gets scored against the client&apos;s rubric, and you get a shareable link to the result.</p>
 
       <form onSubmit={handleSubmit}>
         <fieldset style={{ marginBottom: "1rem", border: "1px solid #ccc", borderRadius: 6, padding: "0.75rem 1rem" }}>
@@ -53,16 +85,65 @@ export default function Home() {
           </label>
         </fieldset>
 
-        <textarea
-          value={transcript}
-          onChange={(e) => setTranscript(e.target.value)}
-          placeholder="Paste the transcript here..."
-          rows={18}
-          required
-          style={{ width: "100%", fontFamily: "ui-monospace, monospace", fontSize: "0.85rem", padding: "0.75rem", boxSizing: "border-box" }}
-        />
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragActive(true);
+          }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={handleDrop}
+          style={{
+            position: "relative",
+            border: dragActive ? "2px dashed #555" : "2px dashed transparent",
+            borderRadius: 6,
+            transition: "border-color 0.1s ease",
+          }}
+        >
+          <textarea
+            value={transcript}
+            onChange={(e) => {
+              setTranscript(e.target.value);
+              setFileName(null); // manual edit after a file load - the loaded-file label would be stale
+            }}
+            placeholder="Paste the transcript here, or drag a .txt file in..."
+            rows={18}
+            required
+            style={{ width: "100%", fontFamily: "ui-monospace, monospace", fontSize: "0.85rem", padding: "0.75rem", boxSizing: "border-box" }}
+          />
+          {dragActive && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                background: "rgba(255,255,255,0.9)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "0.95rem",
+                color: "#555",
+                pointerEvents: "none",
+              }}
+            >
+              Drop the transcript file here
+            </div>
+          )}
+        </div>
 
-        <p style={{ fontSize: "0.8rem", color: transcript.length > MAX_TRANSCRIPT_LENGTH ? "#c0392b" : "#888", marginTop: "0.4rem" }}>
+        <input ref={fileInputRef} type="file" accept=".txt,.srt,.vtt,text/plain" onChange={handleFileInputChange} style={{ display: "none" }} />
+
+        <p style={{ fontSize: "0.8rem", color: "#888", marginTop: "0.4rem" }}>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            style={{ background: "none", border: "none", padding: 0, color: "#1a5f9e", cursor: "pointer", font: "inherit", textDecoration: "underline" }}
+          >
+            Open from folder
+          </button>
+          {" "}or drag a file onto the box above.
+          {fileName && <> &middot; Loaded from <strong>{fileName}</strong></>}
+        </p>
+
+        <p style={{ fontSize: "0.8rem", color: transcript.length > MAX_TRANSCRIPT_LENGTH ? "#c0392b" : "#888", marginTop: "0.2rem" }}>
           {transcript.length.toLocaleString()} / {MAX_TRANSCRIPT_LENGTH.toLocaleString()} characters
           {transcript.length > MAX_TRANSCRIPT_LENGTH && " - too long for a single call transcript"}
         </p>
