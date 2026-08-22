@@ -121,6 +121,12 @@ function RunStatus({ run }: { run: RunResponse }) {
 
   return (
     <div>
+      <p style={{ marginBottom: "1rem" }}>
+        <a href={`/api/runs/${run.id}/pdf`} style={{ fontSize: "0.9rem" }}>
+          ⬇ Download PDF
+        </a>
+      </p>
+
       <ReportView report={run.report as unknown as ReportShape} />
 
       <details style={{ marginTop: "2rem" }}>
