@@ -28,3 +28,14 @@ export const EVIDENCE_WARN_RATE = 0.08;
 export const EVIDENCE_WARN_MIN_COUNT = 3;
 export const EVIDENCE_FAIL_RATE = 0.2;
 export const EVIDENCE_FAIL_MIN_COUNT = 5;
+
+/**
+ * Real observed pipeline durations this session ranged 57-105s. Vercel's
+ * serverless max-duration cap (plan-dependent) means the background `after()`
+ * work COULD get killed mid-run - if that happens, the row is stuck on
+ * status='running' with no further update. Rather than requiring a specific
+ * plan/duration guarantee, a run's page treats 'running' with no update in
+ * this long as stalled and tells the reviewer plainly, instead of spinning
+ * forever - see src/lib/runs.ts's `stalled` computation.
+ */
+export const RUN_STALE_MS = 5 * 60 * 1000;

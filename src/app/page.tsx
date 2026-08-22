@@ -1,69 +1,76 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+
+type CallType = "kickoff" | "coaching";
+
+const MIN_TRANSCRIPT_LENGTH = 20;
 
 export default function Home() {
+  const router = useRouter();
+  const [callType, setCallType] = useState<CallType>("kickoff");
+  const [transcript, setTranscript] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+
+    try {
+      const res = await fetch("/api/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callType, transcript }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Something went wrong submitting the transcript.");
+      router.push(`/runs/${data.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main style={{ maxWidth: 760, margin: "0 auto", padding: "3rem 1.5rem", fontFamily: "system-ui, sans-serif" }}>
+      <h1>Call Scorer</h1>
+      <p>Paste a kickoff or coaching call transcript below. It gets scored against the client&apos;s rubric, and you get a shareable link to the result.</p>
+
+      <form onSubmit={handleSubmit}>
+        <fieldset style={{ marginBottom: "1rem", border: "1px solid #ccc", borderRadius: 6, padding: "0.75rem 1rem" }}>
+          <legend>Call type</legend>
+          <label style={{ marginRight: "1.5rem" }}>
+            <input type="radio" name="callType" value="kickoff" checked={callType === "kickoff"} onChange={() => setCallType("kickoff")} />
+            {" "}Kickoff call
+          </label>
+          <label>
+            <input type="radio" name="callType" value="coaching" checked={callType === "coaching"} onChange={() => setCallType("coaching")} />
+            {" "}Coaching call
+          </label>
+        </fieldset>
+
+        <textarea
+          value={transcript}
+          onChange={(e) => setTranscript(e.target.value)}
+          placeholder="Paste the transcript here..."
+          rows={18}
+          required
+          style={{ width: "100%", fontFamily: "ui-monospace, monospace", fontSize: "0.85rem", padding: "0.75rem", boxSizing: "border-box" }}
         />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+
+        {error && <p style={{ color: "#c0392b" }}>{error}</p>}
+
+        <button
+          type="submit"
+          disabled={submitting || transcript.trim().length < MIN_TRANSCRIPT_LENGTH}
+          style={{ marginTop: "1rem", padding: "0.6rem 1.4rem", fontSize: "1rem", cursor: "pointer" }}
+        >
+          {submitting ? "Submitting..." : "Score this call"}
+        </button>
+      </form>
+    </main>
   );
 }

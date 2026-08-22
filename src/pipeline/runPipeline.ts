@@ -20,14 +20,34 @@ import { runSynthesis, type OneThingCandidate } from "./synthesis";
 import { MODEL } from "@/config";
 import type { Report, ReportDimension } from "@/types/report";
 
+/**
+ * The 3 real LLM calls a run goes through, in order - the single source of
+ * truth for both the DB's `stage` check constraint (db/schema.sql) and the
+ * run page's progress indicator (src/app/runs/[id]/page.tsx). Deterministic
+ * steps (validation, caps, oneThing) aren't included - they're sub-millisecond
+ * and not worth a progress step of their own.
+ */
+export const PIPELINE_STAGES = ["extracting_evidence", "scoring", "summarizing"] as const;
+export type PipelineStage = (typeof PIPELINE_STAGES)[number];
+
+export interface PipelineHooks {
+  /** Called right before each real API call starts. Never called for deterministic steps. */
+  onStageChange?: (stage: PipelineStage) => void | Promise<void>;
+}
+
 function getDisabledDimensionIds(callType: CallType, signals: Stage1ValidationResult["signals"]): string[] {
   if (callType !== "coaching") return [];
   return signals.movementCoachingDisabled ? ["D4"] : [];
 }
 
-export async function runScoringPipeline(callType: CallType, transcript: string): Promise<Report> {
+export async function runScoringPipeline(
+  callType: CallType,
+  transcript: string,
+  hooks: PipelineHooks = {},
+): Promise<Report> {
   const rubric = callType === "kickoff" ? kickoffRubric : coachingRubric;
 
+  await hooks.onStageChange?.("extracting_evidence");
   const { output: stage1Output, indexed } = await runStage1(callType, transcript);
   const validation = validateStage1Output(stage1Output, indexed);
 
@@ -49,6 +69,7 @@ export async function runScoringPipeline(callType: CallType, transcript: string)
   const disabledDimensionIds = getDisabledDimensionIds(callType, correctedSignals);
   const scoredDimensions = validation.dimensions.filter((d) => !disabledDimensionIds.includes(d.dimensionId));
 
+  await hooks.onStageChange?.("scoring");
   const stage2Output = await runStage2(callType, scoredDimensions, disabledDimensionIds);
   const stage2ByDimension = new Map(stage2Output.dimensions.map((d) => [d.dimensionId, d]));
 
@@ -130,6 +151,7 @@ export async function runScoringPipeline(callType: CallType, transcript: string)
 
   // Everything above this point is final - synthesis only writes prose describing it
   // (see synthesis.ts's docstring for why it can't alter any of it).
+  await hooks.onStageChange?.("summarizing");
   const synthesis = await runSynthesis({
     callType,
     dimensions,

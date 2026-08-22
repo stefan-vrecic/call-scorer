@@ -18,6 +18,12 @@ create table if not exists runs (
   transcript_hash text not null,
   status text not null default 'pending'
     check (status in ('pending', 'running', 'complete', 'failed')),
+  -- Which of the 3 real LLM calls is currently in flight, for the run page's
+  -- progress indicator. Only meaningful while status = 'running' - null
+  -- otherwise. See src/pipeline/runPipeline.ts's PipelineStage type, which is
+  -- the single source of truth this check constraint has to stay in sync with.
+  stage text
+    check (stage in ('extracting_evidence', 'scoring', 'summarizing')),
   error text,
   model text,
   report jsonb,
