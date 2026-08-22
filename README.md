@@ -7,6 +7,28 @@ Paste a kickoff or coaching call transcript, get it scored against BeaverMind's 
 
 ## How it works
 
+```mermaid
+flowchart LR
+    T["Transcript"] --> S1
+    S1["Stage 1 - evidence only<br/>indexed lines, forced tool call<br/><i>bands/points withheld</i>"] -->|"per-dimension evidence<br/>{line, quote}"| EV
+    EV["Evidence validator<br/>checks every citation against<br/>the real transcript text"] -->|"invalid citations<br/>stripped"| S2
+    S2["Stage 2 - scoring<br/>full rubric + validated<br/>evidence only<br/><i>never sees raw transcript again</i>"] -->|"score + reasoning<br/>+ quick fix"| DR
+    DR["Deterministic rules (code)<br/>caps · total · band<br/>one-thing simulation"] -->|"final scored report"| SY
+    SY["Synthesis<br/>brief + red flags<br/><i>cannot alter any score/cap</i>"] --> R
+
+    R["Final report"] --> DB[("Supabase")]
+    R --> UI["Web report + PDF"]
+
+    classDef llm fill:#eaf3fb,stroke:#1a5f9e,color:#1a5f9e;
+    classDef code fill:#eafaf1,stroke:#1e7e46,color:#1e7e46;
+    classDef data fill:#f2f2f2,stroke:#888,color:#333;
+    class S1,S2,SY llm;
+    class EV,DR code;
+    class T,R,DB,UI data;
+```
+
+Blue = LLM call, green = deterministic code - evidence-checking, caps, totals, and the "one thing" pick are all code, never model judgment.
+
 1. **Stage 1 - evidence only.** The transcript is indexed into numbered lines; a forced tool call extracts each dimension's observed behaviour plus cited `{line, quote}` evidence. No scoring yet, and the rubric's bands/points are deliberately withheld so early observation isn't anchored toward a score.
 2. **Evidence validator.** Every citation is checked against the actual transcript text at that line. Anything that doesn't match is stripped before it ever reaches scoring - "evidence or nothing," enforced in code, not just prompted for.
 3. **Stage 2 - scoring.** A second call sees the full rubric (bands, points, calibration notes) plus only the *validated* evidence - never the raw transcript again - and scores each dimension with a quick fix.
