@@ -105,7 +105,12 @@ function formatUserContent(input: SynthesisInput): string {
 
   const sections = [
     `Call type: ${input.callType}`,
-    `Total: ${input.total}/${input.maxPossible} (raw total before caps: ${input.rawTotal}) - band: ${input.band}`,
+    // `total` is always on the rescaled /100 scale; `rawTotal`/`maxPossible`
+    // are the pre-rescale raw-dimension-points scale (see applyRubricRules.ts)
+    // - never the same denominator, so never formatted as one fraction. Doing
+    // that here previously produced nonsensical briefs like "100/90" on every
+    // coaching call (maxPossible is 105, or 90 with D4 disabled - never 100).
+    `Total: ${input.total}/100 (raw dimension points: ${input.rawTotal}/${input.maxPossible}) - band: ${input.band}`,
     `Caps that fired:\n${capsText}`,
     `--- Dimensions (already scored, already final) ---\n\n${input.dimensions.map(formatDimension).join("\n\n")}`,
     `--- One-thing candidate (already selected deterministically - do not change or second-guess it) ---\n${oneThingText}`,

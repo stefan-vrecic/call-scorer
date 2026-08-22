@@ -1,0 +1,301 @@
+/*
+ * Phase 7: the real report view, replacing Phase 6's raw-JSON dump.
+ * Plain CSS module, matching the rest of the app (no CSS framework installed).
+ * Band colors are the only "branding" decision here - kept to a small,
+ * consistent palette (green/blue/amber/orange/red) rather than anything fancy.
+ */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+/* ---------- Score banner ---------- */
+
+.banner {
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--band-border);
+  background: var(--band-bg);
+  color: var(--band-fg);
+}
+
+.bannerTop {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.bannerScore {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.bannerMax {
+  font-size: 1.1rem;
+  opacity: 0.75;
+}
+
+.bannerBand {
+  margin-left: auto;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: var(--band-fg);
+  color: var(--band-bg);
+}
+
+.bannerBrief {
+  margin-top: 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.bannerMeta {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.rawTotalNote {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  margin-top: 0.35rem;
+}
+
+/* ---------- Generic section card ---------- */
+
+.card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+
+.cardTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+}
+
+/* ---------- One Thing ---------- */
+
+.oneThing {
+  border-color: #b8860b;
+  background: #fffaf0;
+}
+
+.oneThingHeadline {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.oneThingMove {
+  font-size: 0.9rem;
+  color: #6b5300;
+  margin-bottom: 0.5rem;
+}
+
+/* ---------- Warnings / notices ---------- */
+
+.notice {
+  border-color: #d68910;
+  background: #fef5e7;
+  color: #6b4a00;
+}
+
+.notice ul {
+  margin: 0.4rem 0 0 1.2rem;
+}
+
+.correctionRow {
+  font-size: 0.88rem;
+  padding: 0.3rem 0;
+}
+
+.correctionRow + .correctionRow {
+  border-top: 1px dashed #e0c589;
+}
+
+/* ---------- Red flags ---------- */
+
+.redFlags {
+  border-color: #c0392b;
+  background: #fdecea;
+}
+
+.redFlags ul {
+  margin: 0 0 0 1.2rem;
+}
+
+.redFlags li {
+  margin-bottom: 0.3rem;
+}
+
+/* ---------- Applied caps ---------- */
+
+.caps ul {
+  margin: 0 0 0 1.2rem;
+  font-size: 0.9rem;
+}
+
+.caps li {
+  margin-bottom: 0.3rem;
+}
+
+/* ---------- Dimensions ---------- */
+
+.dimensionList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.dimension {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.dimension[open] {
+  border-color: #bbb;
+}
+
+.dimSummary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  background: #fafafa;
+}
+
+.dimSummary::-webkit-details-marker {
+  display: none;
+}
+
+.dimCaret {
+  font-size: 0.7rem;
+  color: #888;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.dimension[open] .dimCaret {
+  transform: rotate(90deg);
+}
+
+.dimId {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #888;
+  flex-shrink: 0;
+}
+
+.dimName {
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+}
+
+.dimScore {
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.dimScoreDisabled {
+  font-weight: 500;
+  color: #999;
+  font-style: italic;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+
+.dimFlag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.dimFlagCap {
+  background: #fdecea;
+  color: #c0392b;
+}
+
+.dimFlagClamp {
+  background: #fef5e7;
+  color: #b8860b;
+}
+
+.dimFlagInsufficient {
+  background: #eaeef5;
+  color: #4a5b8c;
+}
+
+.dimBody {
+  padding: 0.9rem 1rem 1.1rem;
+  border-top: 1px solid #eee;
+  font-size: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.dimLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #999;
+  margin-bottom: 0.2rem;
+}
+
+.dimNote {
+  font-size: 0.85rem;
+  color: #6b4a00;
+  background: #fef5e7;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+}
+
+.evidenceList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.evidenceItem {
+  font-size: 0.85rem;
+  border-left: 3px solid #ccc;
+  padding: 0.15rem 0 0.15rem 0.6rem;
+}
+
+.evidenceLine {
+  color: #999;
+  font-size: 0.75rem;
+  margin-right: 0.4rem;
+}
+
+.evidenceQuote {
+  font-style: italic;
+}
+
+.noEvidence {
+  font-size: 0.85rem;
+  color: #999;
+  font-style: italic;
+}
+
+/* ---------- Footer meta ---------- */
+
+.footerMeta {
+  font-size: 0.8rem;
+  color: #888;
+}

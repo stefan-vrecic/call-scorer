@@ -1,17 +1,18 @@
 "use client";
 
 /**
- * Phase 6: proves the persistence + async + progress flow works end to end.
- * Deliberately minimal rendering of a complete report (total/band/brief/red
- * flags + a raw JSON dump) - the polished 12-dimension report view is
- * Phase 7's job, not this one. Polls GET /api/runs/[id] every 2s while
- * pending/running so the client stays updated without the operator having
- * to reload, and stops polling the moment there's a terminal state
- * (complete/failed/stalled) so it doesn't poll forever.
+ * Polls GET /api/runs/[id] every 2s while pending/running so the client
+ * stays updated without the operator having to reload, and stops polling
+ * the moment there's a terminal state (complete/failed/stalled) so it
+ * doesn't poll forever. The complete state renders the full report via
+ * ReportView (Phase 7) - Phase 6's raw-JSON dump is now tucked behind a
+ * "view raw data" toggle for debugging, not the primary view.
  */
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
+import ReportView, { type ReportShape } from "./ReportView";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -76,7 +77,7 @@ export default function RunPage() {
 
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "3rem 1.5rem", fontFamily: "system-ui, sans-serif" }}>
-      <p><a href="/">&larr; Score another call</a></p>
+      <p><Link href="/">&larr; Score another call</Link></p>
       <h1>Run {params.id}</h1>
 
       {fetchError && <p style={{ color: "#c0392b" }}>{fetchError}</p>}
@@ -114,33 +115,16 @@ function RunStatus({ run }: { run: RunResponse }) {
   }
 
   // complete
-  const report = run.report as {
-    total?: number;
-    maxPossible?: number;
-    band?: string;
-    brief?: string;
-    redFlags?: string[];
-  } | null;
+  if (!run.report) {
+    return <p>This run completed but no report was recorded - that shouldn&apos;t happen. Please re-submit the transcript.</p>;
+  }
 
   return (
     <div>
-      <div style={{ border: "1px solid #27ae60", borderRadius: 6, padding: "1rem", background: "#eafaf1", marginBottom: "1.5rem" }}>
-        <strong>Score: {report?.total} / {report?.maxPossible} &mdash; {report?.band}</strong>
-        {report?.brief && <p>{report.brief}</p>}
-        {report?.redFlags && report.redFlags.length > 0 && (
-          <>
-            <strong>Red flags</strong>
-            <ul>
-              {report.redFlags.map((flag, i) => (
-                <li key={i}>{flag}</li>
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
+      <ReportView report={run.report as unknown as ReportShape} />
 
-      <details>
-        <summary>Full report (raw JSON - the real report view is coming in the next phase)</summary>
+      <details style={{ marginTop: "2rem" }}>
+        <summary>View raw data</summary>
         <pre style={{ overflowX: "auto", background: "#f5f5f5", padding: "1rem", fontSize: "0.8rem" }}>
           {JSON.stringify(run.report, null, 2)}
         </pre>
