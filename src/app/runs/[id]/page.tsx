@@ -14,6 +14,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import ReportView, { type ReportShape } from "./ReportView";
 
+const COPIED_FEEDBACK_MS = 1800;
+
 const POLL_INTERVAL_MS = 2000;
 
 const STAGE_LABELS: Record<string, string> = {
@@ -78,7 +80,10 @@ export default function RunPage() {
   return (
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "3rem 1.5rem", fontFamily: "system-ui, sans-serif" }}>
       <p><Link href="/">&larr; Score another call</Link></p>
-      <h1>Run {params.id}</h1>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem", flexWrap: "wrap" }}>
+        <h1 style={{ margin: 0 }}>Run {params.id}</h1>
+        <CopyLinkButton />
+      </div>
 
       {fetchError && <p style={{ color: "#c0392b" }}>{fetchError}</p>}
       {!run && !fetchError && <p>Loading...</p>}
@@ -126,11 +131,9 @@ function RunStatus({ run }: { run: RunResponse }) {
 
   return (
     <div>
-      <p style={{ marginBottom: "1rem" }}>
-        <a href={`/api/runs/${run.id}/pdf`} style={{ fontSize: "0.9rem" }}>
-          ⬇ Download PDF
-        </a>
-      </p>
+      <div style={{ marginBottom: "1.5rem" }}>
+        <PdfDownloadButton runId={run.id} />
+      </div>
 
       <ReportView report={run.report as unknown as ReportShape} />
 
@@ -162,5 +165,89 @@ function Progress({ stage }: { stage: string | null }) {
       </ol>
       <p style={{ fontSize: "0.85rem", color: "#666" }}>This page updates on its own - you can also close the tab and come back to this same link later.</p>
     </div>
+  );
+}
+
+/** Copies this run's own URL - the actual "shareable link" the exercise asks for, not just implied by the URL bar. */
+function CopyLinkButton() {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
+    } catch {
+      // Clipboard permission denied/unavailable (e.g. an embedding context
+      // without the clipboard-write permission policy, an old browser) -
+      // fail quietly rather than throw; the URL is still right there in the
+      // address bar as a fallback. Confirmed this is a real, reachable path
+      // (not just theoretical) while verifying this button - the Claude Code
+      // preview browser pane denies clipboard-write entirely, real click or
+      // not, which is exactly the class of environment this catch exists for.
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      style={{
+        fontSize: "0.85rem",
+        padding: "0.3rem 0.7rem",
+        borderRadius: 6,
+        border: "1px solid #ccc",
+        background: copied ? "#eafaf1" : "#fff",
+        borderColor: copied ? "#a8e0c2" : "#ccc",
+        color: copied ? "#1e7e46" : "#333",
+        cursor: "pointer",
+      }}
+    >
+      {copied ? "✅ Copied!" : "🔗 Copy link"}
+    </button>
+  );
+}
+
+/**
+ * A large, thumb-friendly download button - deliberately much bigger than a
+ * plain text link, since "download the PDF" is one of this page's two
+ * primary actions (the other being reading the report itself), not a minor
+ * footnote. Still a real <a href> (not a JS click handler), so the browser's
+ * native download behavior - filename, progress, save location - all work
+ * exactly as it would for any other file link.
+ */
+function PdfDownloadButton({ runId }: { runId: string }) {
+  return (
+    <a
+      href={`/api/runs/${runId}/pdf`}
+      title="Download PDF"
+      style={{
+        display: "inline-flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "0.4rem",
+        padding: "0.9rem 1.4rem",
+        borderRadius: 12,
+        border: "1px solid #e0c9c5",
+        background: "#fff",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+        width: "fit-content",
+      }}
+    >
+      <PdfIcon size={72} />
+      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "#333" }}>Download PDF</span>
+    </a>
+  );
+}
+
+function PdfIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M14 4h26l10 10v46a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="#e74c3c" />
+      <path d="M40 4v10h10" fill="#c0392b" />
+      <text x="32" y="46" fontSize="15" fontWeight="700" fill="#fff" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif">
+        PDF
+      </text>
+    </svg>
   );
 }
