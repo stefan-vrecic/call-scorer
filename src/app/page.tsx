@@ -1,8 +1,10 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { MAX_TRANSCRIPT_LENGTH } from "@/config";
+import { forgetRun, getRecentRuns, rememberRun, type RecentRun } from "@/lib/recentRuns";
 
 type CallType = "kickoff" | "coaching";
 
@@ -87,6 +89,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Something went wrong submitting the transcript.");
+      rememberRun({ id: data.id, callType, createdAt: new Date().toISOString() });
       router.push(`/runs/${data.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -98,6 +101,8 @@ export default function Home() {
     <main style={{ maxWidth: 760, margin: "0 auto", padding: "3rem 1.5rem", fontFamily: "system-ui, sans-serif" }}>
       <h1>Call Scorer</h1>
       <p>Paste, drop, or open a kickoff or coaching call transcript below. It gets scored against the client&apos;s rubric, and you get a shareable link to the result.</p>
+
+      <RecentRunsList />
 
       <form onSubmit={handleSubmit}>
         <fieldset style={{ marginBottom: "1rem", border: "1px solid #ccc", borderRadius: 6, padding: "0.75rem 1rem" }}>
@@ -209,5 +214,106 @@ export default function Home() {
         </button>
       </form>
     </main>
+  );
+}
+
+interface RunStatusInfo {
+  status: "pending" | "running" | "complete" | "failed";
+  stalled: boolean;
+  total?: number;
+  band?: string;
+}
+
+function relativeTime(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+/**
+ * "Close the tab, still find your run" without requiring the user to keep
+ * the URL around - reads run ids this browser has submitted (localStorage,
+ * see src/lib/recentRuns.ts) and fetches each one's LIVE status from the
+ * same GET /api/runs/[id] the run page itself polls, so this list is never
+ * stale/cached - it's a real-time view, just entered from a different page.
+ */
+function RecentRunsList() {
+  const [runs, setRuns] = useState<RecentRun[] | null>(null);
+  const [statuses, setStatuses] = useState<Record<string, RunStatusInfo | "error">>({});
+
+  useEffect(() => {
+    const stored = getRecentRuns();
+    // This page is statically prerendered (no server-side localStorage to
+    // read), so `runs` deliberately starts as `null` to match that empty
+    // server render, then gets populated here after mount - the standard
+    // fix for reading a browser-only store without a hydration mismatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRuns(stored);
+    if (stored.length === 0) return;
+
+    let cancelled = false;
+    Promise.all(
+      stored.map(async (r) => {
+        try {
+          const res = await fetch(`/api/runs/${r.id}`, { cache: "no-store" });
+          if (!res.ok) return [r.id, "error"] as const;
+          const data = await res.json();
+          return [r.id, { status: data.status, stalled: data.stalled, total: data.report?.total, band: data.report?.band }] as const;
+        } catch {
+          return [r.id, "error"] as const;
+        }
+      }),
+    ).then((results) => {
+      if (!cancelled) setStatuses(Object.fromEntries(results));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleRemove(id: string) {
+    forgetRun(id);
+    setRuns((prev) => prev?.filter((r) => r.id !== id) ?? null);
+  }
+
+  if (!runs || runs.length === 0) return null;
+
+  return (
+    <div style={{ border: "1px solid #ddd", borderRadius: 6, padding: "0.75rem 1rem", marginBottom: "1.25rem" }}>
+      <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#888", marginBottom: "0.4rem" }}>
+        RECENT RUNS (this browser)
+      </div>
+      {runs.map((r) => {
+        const s = statuses[r.id];
+        let label: string;
+        if (!s) label = "Checking...";
+        else if (s === "error") label = "Couldn't load";
+        else if (s.status === "failed") label = "❌ Failed";
+        else if (s.stalled) label = "⚠️ Stalled";
+        else if (s.status === "complete") label = `✅ ${s.total ?? "?"}/100 ${s.band ?? ""}`;
+        else label = "⏳ In progress";
+
+        return (
+          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.3rem 0", fontSize: "0.85rem" }}>
+            <Link href={`/runs/${r.id}`} style={{ flex: 1, color: "#1a5f9e", textDecoration: "underline" }}>
+              {r.callType === "kickoff" ? "Kickoff" : "Coaching"} call &middot; {relativeTime(r.createdAt)}
+            </Link>
+            <span style={{ color: "#555" }}>{label}</span>
+            <button
+              type="button"
+              onClick={() => handleRemove(r.id)}
+              title="Remove from this list"
+              style={{ background: "none", border: "none", color: "#aaa", cursor: "pointer", fontSize: "0.9rem", padding: "0 0.2rem" }}
+            >
+              &times;
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
