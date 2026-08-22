@@ -96,25 +96,37 @@ Logged as they happen, phase by phase, so nothing has to be reconstructed from m
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+## Environment setup
 
-First, run the development server:
+The app won't boot without this - `src/lib/supabase.ts` throws on startup if either Supabase variable is missing, and every pipeline call needs a real Anthropic key. Create `.env.local` in the project root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Supabase → Project Settings → API
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service_role secret, not anon>
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`SUPABASE_SERVICE_ROLE_KEY` is intentionally the `service_role` key, not `anon` - the `runs` table has RLS enabled with zero policies, so this is the only key that can read/write it at all (see Phase 6). Never expose this key to the client; every Supabase access goes through `src/lib/supabase.ts` on the server only.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Then, against that same Supabase project, apply the schema once (SQL Editor, paste the contents of `db/schema.sql`, run). It's idempotent (`create table if not exists`, etc.) so re-running it later is harmless.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Getting Started
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000), paste a kickoff or coaching call transcript in, and submit - or use the CLI scripts to run a specific stage without going through the UI/DB at all:
+
+```bash
+npm test                                                          # unit tests (43 currently)
+npm run stage1 -- <kickoff|coaching> <path-to-transcript.txt>     # Stage 1 evidence extraction only
+npm run validate                                                  # re-check saved dev-output/ against the real transcripts, no API cost
+npm run pipeline -- <kickoff|coaching> <path-to-transcript.txt>   # full pipeline end to end, prints the report, no DB write
+```
 
 ## Learn More
 
