@@ -99,12 +99,17 @@ function RunStatus({ run }: { run: RunResponse }) {
   }
 
   if (run.stalled) {
+    // run.stage is null both before the pipeline's first stage-change write
+    // and whenever it never got that far (e.g. a Phase 9 double-failure -
+    // see api/runs/route.ts) - "hasn't started" reads correctly in both
+    // cases, rather than rendering an empty pair of quotes.
+    const stageDescription = run.stage ? (STAGE_LABELS[run.stage] ?? run.stage) : "hasn't started";
     return (
       <div style={{ border: "1px solid #d68910", borderRadius: 6, padding: "1rem", background: "#fef5e7" }}>
         <strong>This run appears to have stalled.</strong>
         <p>
-          It&apos;s been on &ldquo;{STAGE_LABELS[run.stage ?? ""] ?? run.stage}&rdquo; for longer than expected and hasn&apos;t updated -
-          most likely the background job was interrupted before it could finish or report an error. Try submitting the transcript again.
+          It&apos;s been stuck ({stageDescription}) for longer than expected and hasn&apos;t updated - most likely the background job
+          was interrupted before it could finish or report an error. Try submitting the transcript again.
         </p>
       </div>
     );

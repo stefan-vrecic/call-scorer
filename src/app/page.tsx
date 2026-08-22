@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { MAX_TRANSCRIPT_LENGTH } from "@/config";
 
 type CallType = "kickoff" | "coaching";
 
@@ -61,11 +62,16 @@ export default function Home() {
           style={{ width: "100%", fontFamily: "ui-monospace, monospace", fontSize: "0.85rem", padding: "0.75rem", boxSizing: "border-box" }}
         />
 
+        <p style={{ fontSize: "0.8rem", color: transcript.length > MAX_TRANSCRIPT_LENGTH ? "#c0392b" : "#888", marginTop: "0.4rem" }}>
+          {transcript.length.toLocaleString()} / {MAX_TRANSCRIPT_LENGTH.toLocaleString()} characters
+          {transcript.length > MAX_TRANSCRIPT_LENGTH && " - too long for a single call transcript"}
+        </p>
+
         {error && <p style={{ color: "#c0392b" }}>{error}</p>}
 
         <button
           type="submit"
-          disabled={submitting || transcript.trim().length < MIN_TRANSCRIPT_LENGTH}
+          disabled={submitting || transcript.trim().length < MIN_TRANSCRIPT_LENGTH || transcript.length > MAX_TRANSCRIPT_LENGTH}
           style={{ marginTop: "1rem", padding: "0.6rem 1.4rem", fontSize: "1rem", cursor: "pointer" }}
         >
           {submitting ? "Submitting..." : "Score this call"}

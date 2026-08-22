@@ -39,3 +39,29 @@ export const EVIDENCE_FAIL_MIN_COUNT = 5;
  * forever - see src/lib/runs.ts's `stalled` computation.
  */
 export const RUN_STALE_MS = 5 * 60 * 1000;
+
+/**
+ * Phase 9 hardening: input guardrails on POST /api/runs, enforced BEFORE the
+ * transcript is hashed/stored/sent to any API - the whole point is to reject
+ * an out-of-scope paste before it costs anything, not after.
+ *
+ * MAX_TRANSCRIPT_LENGTH is a cost guardrail, not a content judgment: nothing
+ * currently stops someone pasting something far outside "one call transcript"
+ * (a log file, a whole document, an accidental multi-paste) and paying real
+ * Stage 1/2 input-token cost for it. All 4 real reference transcripts are
+ * 15,000-65,000 characters; 150,000 is ~2.3x the largest real one - generous
+ * headroom for a genuinely long call, while still catching something that's
+ * clearly not a single call transcript.
+ *
+ * MIN_TRANSCRIPT_LINES is a quality guardrail, not a length one: a transcript
+ * with too few line breaks isn't caught by MIN_TRANSCRIPT_LENGTH (a long
+ * single line passes it easily) but breaks the evidence-citation mechanism
+ * itself - indexTranscript() (Phase 2) treats every non-blank line as one
+ * turn, so a near-single-line paste collapses most/all citations to the same
+ * line number, silently degrading every dimension's evidence instead of
+ * erroring. Real transcripts run into the hundreds of lines; 5 is a low,
+ * deliberately permissive floor - just enough to catch "this obviously isn't
+ * a real multi-turn transcript," not to police formatting.
+ */
+export const MAX_TRANSCRIPT_LENGTH = 150_000;
+export const MIN_TRANSCRIPT_LINES = 5;
