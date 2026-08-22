@@ -1,6 +1,55 @@
-## Engineering decisions & trade-offs (running notes - will be tidied into a proper README before submission)
+# Call Scorer
 
-Logged as they happen, phase by phase, so nothing has to be reconstructed from memory later.
+Paste a kickoff or coaching call transcript, get it scored against BeaverMind's rubric (12 dimensions per call type, evidence checked before anything gets scored) and turned into a shareable report - total, band, "the one thing" to improve, red flags, and a downloadable PDF.
+
+**Live:** https://call-scorer-inky.vercel.app
+**Source spec** (reference only): [hiring-ai-dev-exercise](https://github.com/lukecala/hiring-ai-dev-exercise)
+
+## How it works
+
+1. **Stage 1 - evidence only.** The transcript is indexed into numbered lines; a forced tool call extracts each dimension's observed behaviour plus cited `{line, quote}` evidence. No scoring yet, and the rubric's bands/points are deliberately withheld so early observation isn't anchored toward a score.
+2. **Evidence validator.** Every citation is checked against the actual transcript text at that line. Anything that doesn't match is stripped before it ever reaches scoring - "evidence or nothing," enforced in code, not just prompted for.
+3. **Stage 2 - scoring.** A second call sees the full rubric (bands, points, calibration notes) plus only the *validated* evidence - never the raw transcript again - and scores each dimension with a quick fix.
+4. **Deterministic rules - plain code, not the model.** Applies each rubric's automatic-cap table, computes the total and band, and figures out "the one thing" by simulating maxing each dimension (lifting any cap it would clear) and picking the largest score delta.
+5. **Synthesis.** A small, strictly downstream call turns the already-final structured result into a brief + red flags. It cannot change a score, a cap, or the one-thing selection - only describe what's already decided.
+
+Persistence is Supabase (RLS on, zero policies - only the server-side `service_role` key can touch it), the pipeline runs server-side after the initial response via Next's `after()` (closing the tab doesn't stop it), and the model is `claude-sonnet-5` (`src/config.ts`).
+
+## Environment setup
+
+The app won't boot without this - `src/lib/supabase.ts` throws on startup if either Supabase variable is missing, and every pipeline call needs a real Anthropic key. Create `.env.local` in the project root:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Supabase → Project Settings → API
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service_role secret, not anon>
+```
+
+`SUPABASE_SERVICE_ROLE_KEY` is intentionally the `service_role` key, not `anon` - the `runs` table has RLS enabled with zero policies, so this is the only key that can read/write it at all. Never expose this key to the client; every Supabase access goes through `src/lib/supabase.ts` on the server only.
+
+Then, against that same Supabase project, apply the schema once (SQL Editor, paste the contents of `db/schema.sql`, run). It's idempotent (`create table if not exists`, etc.) so re-running it later is harmless.
+
+## Getting started
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000), paste (or drag/drop, or open from folder) a kickoff or coaching call transcript, and submit - or use the CLI scripts to run a specific stage without going through the UI/DB at all:
+
+```bash
+npm test                                                          # unit tests (43 currently)
+npm run stage1 -- <kickoff|coaching> <path-to-transcript.txt>     # Stage 1 evidence extraction only
+npm run validate                                                  # re-check saved dev-output/ against the real transcripts, no API cost
+npm run pipeline -- <kickoff|coaching> <path-to-transcript.txt>   # full pipeline end to end, prints the report, no DB write
+```
+
+## Engineering decisions & trade-offs
+
+Logged as they happened, phase by phase, so nothing has to be reconstructed from memory later - this is the real build log, not a cleaned-up summary written after the fact. It's long on purpose: the process (what was tried, what broke, how it was actually verified) is the point, not just the fact that it works.
 
 ### Loom quick reference - strongest stories to tell, jump to the full writeup
 
@@ -119,51 +168,6 @@ Logged as they happen, phase by phase, so nothing has to be reconstructed from m
 - **The run that got killed by the bug was left alone, not deleted, as a live proof of the staleness backstop.** Rather than clean it up, watched it: `status` stayed `'running'` forever (Supabase never got a `failed` write, because the function was killed mid-flight, not thrown), but `GET /api/runs/[id]`'s `stalled` computation correctly flipped to `true` once `RUN_STALE_MS` elapsed, and the run page rendered "This run appears to have stalled... It's been stuck (Writing the summary)..." - the exact failure-visibility chain Phase 6 was built for, now proven end to end on real infrastructure instead of only in a forced-404 test.
 - **Full live coverage, not a spot check:** all 4 transcripts complete with correct scores (`kickoff-01` 98/100 Elite, `kickoff-02` 66.5/100 At Risk, `coaching-01` 100/100 Elite, `coaching-02` 100/100 Elite - all matching established baselines), the Phase 7 report UI renders correctly live (including the total/maxPossible scale fix - the brief correctly reads "66.5/100"), the Phase 8 PDF endpoint returns a real `%PDF-1.3` file live, and the Phase 9 input guardrails (`MAX_TRANSCRIPT_LENGTH`, `MIN_TRANSCRIPT_LINES`) both reject correctly against the live API, not just local dev.
 
+---
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Environment setup
-
-The app won't boot without this - `src/lib/supabase.ts` throws on startup if either Supabase variable is missing, and every pipeline call needs a real Anthropic key. Create `.env.local` in the project root:
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Supabase → Project Settings → API
-NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<service_role secret, not anon>
-```
-
-`SUPABASE_SERVICE_ROLE_KEY` is intentionally the `service_role` key, not `anon` - the `runs` table has RLS enabled with zero policies, so this is the only key that can read/write it at all (see Phase 6). Never expose this key to the client; every Supabase access goes through `src/lib/supabase.ts` on the server only.
-
-Then, against that same Supabase project, apply the schema once (SQL Editor, paste the contents of `db/schema.sql`, run). It's idempotent (`create table if not exists`, etc.) so re-running it later is harmless.
-
-## Getting Started
-
-```bash
-npm install
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000), paste a kickoff or coaching call transcript in, and submit - or use the CLI scripts to run a specific stage without going through the UI/DB at all:
-
-```bash
-npm test                                                          # unit tests (43 currently)
-npm run stage1 -- <kickoff|coaching> <path-to-transcript.txt>     # Stage 1 evidence extraction only
-npm run validate                                                  # re-check saved dev-output/ against the real transcripts, no API cost
-npm run pipeline -- <kickoff|coaching> <path-to-transcript.txt>   # full pipeline end to end, prints the report, no DB write
-```
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

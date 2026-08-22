@@ -43,3 +43,6 @@ next-env.d.ts
 
 # scratch output from dev CLI scripts (stage1, stage2, ...) - regenerate anytime, not a deliverable
 /dev-output/
+
+# personal submission prep - not a deliverable, never committed
+LOOM_SCRIPT.md
