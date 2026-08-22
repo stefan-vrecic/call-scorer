@@ -1,10 +1,21 @@
 /**
  * POST /api/runs - creates a run and responds immediately with its id; the
- * actual scoring pipeline (60-105s observed) runs AFTER the response is
- * sent, via Next's after() - this is what makes "I can close the tab, the
- * evaluation keeps running" true. maxDuration is set to a value safe on
- * every Vercel plan; see config.ts's RUN_STALE_MS for the backstop if a
- * plan's real cap ever kills this mid-run anyway.
+ * actual scoring pipeline (60-105s observed LOCALLY, without a retry) runs
+ * AFTER the response is sent, via Next's after() - this is what makes "I can
+ * close the tab, the evaluation keeps running" true.
+ *
+ * Phase 10 finding: maxDuration was originally 60, reasoned as "safe on
+ * every Vercel plan" - live-tested against the real production deployment,
+ * NOT a safe assumption. A real run needed one synthesis retry (the known
+ * Phase 5 redFlags-malformation case - expected occasionally, not itself a
+ * bug) and Vercel killed it at exactly 60s: "Vercel Runtime Timeout Error:
+ * Task timed out after 60 seconds", confirmed via `vercel logs`. 60s covers
+ * the no-retry case with barely any margin and has none at all for even one
+ * retry on any of the 3 LLM calls - raised to 180s, which comfortably covers
+ * the worst locally-observed no-retry pipeline (105s) plus room for a retry,
+ * while staying well under RUN_STALE_MS (5 min, config.ts) so the staleness
+ * backstop still has real headroom beyond legitimate max duration, not just
+ * a hair's difference from it.
  */
 
 import { NextResponse, after } from "next/server";
@@ -14,7 +25,7 @@ import { runScoringPipeline, type PipelineStage } from "@/pipeline/runPipeline";
 import { MODEL, MAX_TRANSCRIPT_LENGTH, MIN_TRANSCRIPT_LINES } from "@/config";
 import type { CallType } from "@/types/rubric";
 
-export const maxDuration = 60;
+export const maxDuration = 180;
 
 const MIN_TRANSCRIPT_LENGTH = 20;
 
