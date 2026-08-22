@@ -8,15 +8,40 @@ type CallType = "kickoff" | "coaching";
 
 const MIN_TRANSCRIPT_LENGTH = 20;
 
+// Loose on purpose - catches "kickoff-01.txt", "Kick_Off Call.txt",
+// "coaching-02.txt", "Coach Session.txt", etc. A filename matching BOTH (or
+// neither) patterns returns null - genuinely ambiguous, so say nothing
+// rather than guess wrong with false confidence.
+const KICKOFF_PATTERN = /kick[\s_-]?off/i;
+const COACHING_PATTERN = /coach(ing)?/i;
+
+function detectCallTypeFromFilename(name: string): CallType | null {
+  const isKickoff = KICKOFF_PATTERN.test(name);
+  const isCoaching = COACHING_PATTERN.test(name);
+  if (isKickoff && !isCoaching) return "kickoff";
+  if (isCoaching && !isKickoff) return "coaching";
+  return null;
+}
+
+const CALL_TYPE_LABEL: Record<CallType, string> = { kickoff: "Kickoff call", coaching: "Coaching call" };
+
 export default function Home() {
   const router = useRouter();
   const [callType, setCallType] = useState<CallType>("kickoff");
   const [transcript, setTranscript] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
+  const [detectedType, setDetectedType] = useState<CallType | null>(null);
+  const [mismatchDismissed, setMismatchDismissed] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // True only when the filename confidently suggests ONE type and it
+  // disagrees with whichever radio is currently selected - re-evaluated on
+  // every render, so switching the radio (or loading a different file)
+  // naturally clears it without needing separate reset logic.
+  const typeMismatch = detectedType !== null && detectedType !== callType && !mismatchDismissed;
 
   // Reads the file as text client-side and drops it straight into the same
   // `transcript` state the textarea already uses - a file is just a second
@@ -25,6 +50,8 @@ export default function Home() {
   // is identical whether the text came from typing, pasting, or a file).
   function loadFile(file: File) {
     setError(null);
+    setMismatchDismissed(false);
+    setDetectedType(detectCallTypeFromFilename(file.name));
     const reader = new FileReader();
     reader.onload = () => {
       setTranscript(typeof reader.result === "string" ? reader.result : "");
@@ -142,6 +169,29 @@ export default function Home() {
           {" "}or drag a file onto the box above.
           {fileName && <> &middot; Loaded from <strong>{fileName}</strong></>}
         </p>
+
+        {typeMismatch && detectedType && (
+          <div style={{ border: "1px solid #d68910", borderRadius: 6, background: "#fef5e7", padding: "0.6rem 0.8rem", margin: "0.5rem 0", fontSize: "0.85rem" }}>
+            <strong>&ldquo;{fileName}&rdquo; looks like a {CALL_TYPE_LABEL[detectedType].toLowerCase()}</strong>, but{" "}
+            {CALL_TYPE_LABEL[callType].toLowerCase()} is selected above.
+            <div style={{ marginTop: "0.4rem" }}>
+              <button
+                type="button"
+                onClick={() => setCallType(detectedType)}
+                style={{ marginRight: "0.6rem", padding: "0.3rem 0.7rem", fontSize: "0.8rem", cursor: "pointer" }}
+              >
+                Switch to {CALL_TYPE_LABEL[detectedType]}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMismatchDismissed(true)}
+                style={{ background: "none", border: "none", color: "#6b4a00", textDecoration: "underline", cursor: "pointer", fontSize: "0.8rem" }}
+              >
+                Keep as {CALL_TYPE_LABEL[callType]}
+              </button>
+            </div>
+          </div>
+        )}
 
         <p style={{ fontSize: "0.8rem", color: transcript.length > MAX_TRANSCRIPT_LENGTH ? "#c0392b" : "#888", marginTop: "0.2rem" }}>
           {transcript.length.toLocaleString()} / {MAX_TRANSCRIPT_LENGTH.toLocaleString()} characters
