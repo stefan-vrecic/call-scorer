@@ -15,7 +15,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { SynthesisOutputSchema, type SynthesisOutput } from "@/types/evaluation";
 import { buildSynthesisSystemPrompt } from "./synthesisPrompt";
 import { callToolWithRetry } from "./toolCall";
-import { MODEL, SYNTHESIS_MAX_TOKENS } from "@/config";
+import { SYNTHESIS_MODEL, SYNTHESIS_MAX_TOKENS } from "@/config";
 import type { CallType } from "@/types/rubric";
 import type { ReportDimension, AppliedCap, SignalCorrection } from "@/types/report";
 
@@ -137,7 +137,7 @@ export async function runSynthesis(input: SynthesisInput): Promise<SynthesisOutp
   return callToolWithRetry({
     client,
     request: {
-      model: MODEL,
+      model: SYNTHESIS_MODEL,
       max_tokens: SYNTHESIS_MAX_TOKENS,
       system,
       messages: [{ role: "user", content: userContent }],

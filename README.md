@@ -77,6 +77,7 @@ npm run pipeline -- <kickoff|coaching> <path-to-transcript.txt>   # full pipelin
 - **The strongest bug of the build**: a Stage 1 call-level signal contradicted its own dimension's validated evidence, wrongly zeroing a real 5/5. Fixed with a deterministic correction that only trusts *validated* evidence - never a bare, unverified claim.
 - **A bug only a live deployment could find**: a 60-second function timeout that 4 phases of thorough local testing never tripped, caught the first time a run actually needed a retry in production. Fixed and reverified live.
 - **No auth, by design** - Supabase RLS is on with zero policies (only the server's service-role key can touch the data); sharing is by URL, matching "send this link to a colleague."
+- **Split model choice.** Stage 1 (evidence) and Stage 2 (scoring) run on Sonnet - that's what's actually being graded. Synthesis (brief/red flags) is strictly downstream of already-final data (can't touch a score or citation, see `src/pipeline/synthesis.ts`), so it runs on the cheaper Haiku with no accuracy exposure - `src/config.ts`.
 - **Deliberately out of scope**: concurrent double-submit races, and transcript formats other than the exercise's own `[Speaker]: text` shape.
 - Every decision above was verified against real transcripts and a real deployment, not mocked - see [`ENGINEERING_LOG.md`](./ENGINEERING_LOG.md) for the full phase-by-phase record: every bug, every trade-off considered and rejected, and exactly how each fix was proven.
 

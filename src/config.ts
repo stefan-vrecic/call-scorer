@@ -7,6 +7,17 @@
 
 export const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5";
 
+/**
+ * Synthesis (brief + red flags + oneThing explanation) is strictly downstream
+ * of already-final, already-validated, already-scored data - see the header
+ * comment in synthesis.ts. It can't touch a score, cap, or citation, so it
+ * doesn't need Stage 1/2's model quality; a cheaper model here is a cost win
+ * with no exposure to the evidence-checking/scoring accuracy the rest of the
+ * pipeline is actually graded on. Stage 1 (evidence) and Stage 2 (scoring)
+ * deliberately stay on MODEL/Sonnet.
+ */
+export const SYNTHESIS_MODEL = process.env.ANTHROPIC_SYNTHESIS_MODEL ?? "claude-haiku-4-5";
+
 /** Evidence JSON for 12 dimensions + call-level signals - generous headroom, not expected to get close. */
 export const STAGE1_MAX_TOKENS = 8000;
 
