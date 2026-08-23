@@ -79,6 +79,7 @@ npm run pipeline -- <kickoff|coaching> <path-to-transcript.txt>
 - **Rubric totals are derived from dimensions.** Coaching dimensions total 105 points despite conflicting numbers in the source scope note, so the app calculates the maximum from the actual rubric.
 - **Caught by a system built to distrust the model.** A Stage 1 signal once contradicted its own dimension's validated evidence and wrongly zeroed a real score - fixed with a deterministic check that only trusts validated evidence, never a bare claim.
 - **A bug only a live deployment could catch.** A function timeout that four phases of local-only testing never tripped, found and fixed against real production latency.
+- **A bug found by reading the spec's "taste" requirement literally.** Actually rendering a real PDF, not just trusting the code, surfaced `85.55555555555556 / 100` on a D4-disabled coaching call - a repeating decimal from an unrounded rescale, never caught because most spot-checked runs don't rescale at all. Fixed at the one source function; every consumer inherits it.
 - **Deliberately out of scope:** concurrent double-submit races, and transcript formats other than the exercise's own `[Speaker]: text` shape.
 
 For detailed implementation notes, trade-offs, and validation history, see [`ENGINEERING_LOG.md`](./ENGINEERING_LOG.md).
