@@ -98,7 +98,22 @@ function RunStatus({ run }: { run: RunResponse }) {
     return (
       <div style={{ border: "1px solid #c0392b", borderRadius: 6, padding: "1rem", background: "#fdecea" }}>
         <strong>This run failed.</strong>
-        <p style={{ marginBottom: 0 }}>{run.error ?? "No error message was recorded."}</p>
+        <p>
+          Something went wrong while scoring this call - this isn&apos;t something you did. Try submitting the transcript again; if it
+          keeps happening, share this link with whoever&apos;s maintaining the tool.
+        </p>
+        {run.error && (
+          // The underlying message is whatever the pipeline actually threw - a real Anthropic API error, a
+          // network failure, an internal guardrail message - not written for an end user to read cold. Kept
+          // available, not deleted, since it's the whole point of a shareable link for debugging - just not
+          // the first thing someone sees, same "detail behind a toggle" treatment as the raw report JSON below.
+          <details style={{ marginTop: "0.75rem" }}>
+            <summary style={{ cursor: "pointer" }}>Technical details</summary>
+            <pre style={{ overflowX: "auto", background: "#fff", padding: "0.75rem", fontSize: "0.8rem", marginTop: "0.5rem", whiteSpace: "pre-wrap" }}>
+              {run.error}
+            </pre>
+          </details>
+        )}
       </div>
     );
   }
