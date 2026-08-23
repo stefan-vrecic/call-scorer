@@ -49,7 +49,7 @@ export async function runScoringPipeline(
 
   await hooks.onStageChange?.("extracting_evidence");
   const { output: stage1Output, indexed } = await runStage1(callType, transcript);
-  const validation = validateStage1Output(stage1Output, indexed);
+  const validation = validateStage1Output(stage1Output, indexed, rubric);
 
   if (validation.summary.fail) {
     throw new Error(
@@ -182,6 +182,7 @@ export async function runScoringPipeline(
       : null,
     evidenceWarning: validation.summary.warning,
     signalCorrections,
+    signalEvidenceIssues: validation.signalEvidenceIssues,
     brief: synthesis.brief,
     redFlags: synthesis.redFlags,
     generatedAt: new Date().toISOString(),

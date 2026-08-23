@@ -13,6 +13,8 @@ import { join, basename } from "node:path";
 import { indexTranscript } from "../src/lib/transcript";
 import { validateStage1Output } from "../src/pipeline/evidenceValidator";
 import type { Stage1Output } from "../src/types/evaluation";
+import { kickoffRubric } from "../src/rubrics/kickoff";
+import { coachingRubric } from "../src/rubrics/coaching";
 
 const DEV_OUTPUT_DIR = join(process.cwd(), "dev-output");
 const TRANSCRIPTS_DIR = join(process.cwd(), "..", "exercise-reference", "transcripts");
@@ -33,8 +35,10 @@ function main() {
 
     const output: Stage1Output = JSON.parse(readFileSync(join(DEV_OUTPUT_DIR, file), "utf-8"));
     const transcript = indexTranscript(readFileSync(transcriptPath, "utf-8"));
+    // Saved filenames are always <kickoff|coaching>-NN.txt (see scripts/runStage1.ts) - same convention the rubric-selection logic elsewhere in the app relies on.
+    const rubric = transcriptName.startsWith("coaching") ? coachingRubric : kickoffRubric;
 
-    const result = validateStage1Output(output, transcript);
+    const result = validateStage1Output(output, transcript, rubric);
     grandTotal += result.summary.totalEvidence;
     grandInvalid += result.summary.invalidEvidence;
 

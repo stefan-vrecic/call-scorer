@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { indexTranscript } from "@/lib/transcript";
 import { validateEvidenceItem, validateStage1Output } from "./evidenceValidator";
 import type { Stage1Output } from "@/types/evaluation";
+import { kickoffRubric } from "@/rubrics/kickoff";
 
 const transcript = indexTranscript(
   [
@@ -62,7 +63,7 @@ test("a dimension with zero evidence to begin with keeps Stage 1's own insuffici
     dimensions: [{ dimensionId: "D1", observed: false, observedBehaviour: "Nothing relevant found.", evidence: [], insufficientEvidence: true }],
     signals: {},
   };
-  const result = validateStage1Output(output, transcript);
+  const result = validateStage1Output(output, transcript, kickoffRubric);
   const d1 = result.dimensions[0];
   assert.equal(d1.insufficientEvidence, true);
   assert.equal(d1.allEvidenceRejected, false); // Stage 1 never claimed evidence in the first place
@@ -81,7 +82,7 @@ test("a dimension where EVERY citation fails validation gets insufficientEvidenc
     ],
     signals: {},
   };
-  const result = validateStage1Output(output, transcript);
+  const result = validateStage1Output(output, transcript, kickoffRubric);
   const d3 = result.dimensions[0];
   assert.equal(d3.allEvidenceRejected, true);
   assert.equal(d3.insufficientEvidence, true);
@@ -104,7 +105,7 @@ test("a dimension with SOME valid and some invalid evidence keeps only the valid
     ],
     signals: {},
   };
-  const result = validateStage1Output(output, transcript);
+  const result = validateStage1Output(output, transcript, kickoffRubric);
   const d3 = result.dimensions[0];
   assert.equal(d3.validEvidence.length, 1);
   assert.equal(d3.allEvidenceRejected, false);
@@ -120,7 +121,7 @@ test("aggregate summary: warning fires on rate OR count, fail requires rate AND 
     evidence: [{ line: i < 3 ? 999 : 1, quote: i < 3 ? "fabricated" : "Hey, is this Owen?" }],
     insufficientEvidence: false,
   }));
-  const result = validateStage1Output({ dimensions: dims, signals: {} }, transcript);
+  const result = validateStage1Output({ dimensions: dims, signals: {} }, transcript, kickoffRubric);
   assert.equal(result.summary.totalEvidence, 20);
   assert.equal(result.summary.invalidEvidence, 3);
   assert.equal(result.summary.warning, true);
@@ -128,9 +129,74 @@ test("aggregate summary: warning fires on rate OR count, fail requires rate AND 
 });
 
 test("no evidence anywhere in the call -> invalidRate is 0, not NaN, no warning/fail", () => {
-  const result = validateStage1Output({ dimensions: [], signals: {} }, transcript);
+  const result = validateStage1Output({ dimensions: [], signals: {} }, transcript, kickoffRubric);
   assert.equal(result.summary.totalEvidence, 0);
   assert.equal(result.summary.invalidRate, 0);
   assert.equal(result.summary.warning, false);
   assert.equal(result.summary.fail, false);
+});
+
+// --- Cap-signal citation validation (ChatGPT review finding, closed here) ---
+// kickoffRubric's "no-follow-up-questions" cap: signal noFollowUpQuestionsAnywhere, firesWhenSignalIs: true.
+
+test("cap-firing signal with a citation that validates: trusted as-is, no issue recorded", () => {
+  const output: Stage1Output = {
+    dimensions: [],
+    signals: { noFollowUpQuestionsAnywhere: { value: true, quote: "Hey, is this Owen?", line: 1 } },
+  };
+  const result = validateStage1Output(output, transcript, kickoffRubric);
+  assert.equal(result.signals.noFollowUpQuestionsAnywhere, true);
+  assert.equal(result.signalEvidenceIssues.length, 0);
+});
+
+test("cap-firing signal with NO citation: flipped to the non-firing default, issue recorded", () => {
+  const output: Stage1Output = {
+    dimensions: [],
+    signals: { noFollowUpQuestionsAnywhere: { value: true } },
+  };
+  const result = validateStage1Output(output, transcript, kickoffRubric);
+  assert.equal(result.signals.noFollowUpQuestionsAnywhere, false);
+  assert.equal(result.signalEvidenceIssues.length, 1);
+  assert.equal(result.signalEvidenceIssues[0].signal, "noFollowUpQuestionsAnywhere");
+  assert.equal(result.signalEvidenceIssues[0].capId, "no-follow-up-questions");
+  assert.equal(result.signalEvidenceIssues[0].reportedValue, true);
+  assert.equal(result.signalEvidenceIssues[0].correctedValue, false);
+});
+
+test("cap-firing signal with a citation that fails validation: flipped, issue recorded", () => {
+  const output: Stage1Output = {
+    dimensions: [],
+    signals: { clientUnresolvedConfusion: { value: true, quote: "completely fabricated quote", line: 1 } },
+  };
+  const result = validateStage1Output(output, transcript, kickoffRubric);
+  assert.equal(result.signals.clientUnresolvedConfusion, false);
+  assert.equal(result.signalEvidenceIssues.length, 1);
+  assert.equal(result.signalEvidenceIssues[0].capId, "unresolved-confusion");
+});
+
+test("non-firing signal value requires no citation at all - passes through untouched", () => {
+  const output: Stage1Output = {
+    dimensions: [],
+    signals: { noFollowUpQuestionsAnywhere: { value: false } },
+  };
+  const result = validateStage1Output(output, transcript, kickoffRubric);
+  assert.equal(result.signals.noFollowUpQuestionsAnywhere, false);
+  assert.equal(result.signalEvidenceIssues.length, 0);
+});
+
+test("a signal Stage 1 didn't report at all stays absent - unaffected by the new validation step", () => {
+  const result = validateStage1Output({ dimensions: [], signals: {} }, transcript, kickoffRubric);
+  assert.equal(result.signals.noFollowUpQuestionsAnywhere, undefined);
+  assert.equal(result.signalEvidenceIssues.length, 0);
+});
+
+test("movementCoachingDisabled/Reason are not cap signals - pass through unvalidated, unchanged", () => {
+  const output: Stage1Output = {
+    dimensions: [],
+    signals: { movementCoachingDisabled: true, movementCoachingDisabledReason: "no movement coaching on this call" },
+  };
+  const result = validateStage1Output(output, transcript, kickoffRubric);
+  assert.equal(result.signals.movementCoachingDisabled, true);
+  assert.equal(result.signals.movementCoachingDisabledReason, "no movement coaching on this call");
+  assert.equal(result.signalEvidenceIssues.length, 0);
 });

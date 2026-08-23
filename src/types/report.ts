@@ -28,6 +28,25 @@ export interface SignalCorrection {
   reason: string;
 }
 
+/**
+ * Records a case where a cap-relevant signal was reported at the polarity
+ * that would fire a cap, but its citation was missing or didn't validate
+ * against the real transcript - see pipeline/evidenceValidator.ts. The signal
+ * was flipped to the non-firing value before scoring, the same "unvalidated
+ * counts as absent" bar Phase 3 already applies to per-dimension evidence.
+ * Distinct from SignalCorrection above: that one catches a signal
+ * contradicting its OWN paired dimension's evidence; this one catches a
+ * signal that never had a real citation of its own in the first place.
+ */
+export interface SignalEvidenceIssue {
+  signal: string;
+  /** id of the AutomaticCap this signal would have fired, for cross-referencing appliedCaps. */
+  capId: string;
+  reportedValue: boolean;
+  correctedValue: boolean;
+  reason: string;
+}
+
 export interface AppliedCap {
   id: string;
   /** The rubric's own human-readable condition text, for the report/PDF to display. */
@@ -91,6 +110,8 @@ export interface Report {
   evidenceWarning: boolean;
   /** Empty when Stage 1's signals were internally consistent - see pipeline/signalConsistency.ts. */
   signalCorrections: SignalCorrection[];
+  /** Empty when every cap-firing signal Stage 1 reported had a citation that validated - see pipeline/evidenceValidator.ts. */
+  signalEvidenceIssues: SignalEvidenceIssue[];
   brief: string;
   redFlags: string[];
   generatedAt: string;

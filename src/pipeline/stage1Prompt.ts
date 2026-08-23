@@ -26,7 +26,9 @@ function formatDimension(dimension: RubricContract["dimensions"][number]): strin
 
 function formatSignals(rubric: RubricContract): string {
   const lines = rubric.automaticCaps.map(
-    (cap) => `- ${cap.signal}: true when the following is the case - "${cap.condition}". Otherwise false.`,
+    (cap) =>
+      `- ${cap.signal}: an object { value, quote, line }. value is true when the following is the case - "${cap.condition}". Otherwise false. ` +
+      `When value is ${cap.firesWhenSignalIs} (the polarity that actually triggers a scoring cap), you MUST also give quote + line - the exact transcript citation supporting it, same rules as dimension evidence above. This is checked the same way dimension citations are; an unvalidated or missing citation here means the cap is treated as NOT firing, no matter what value says. When value is ${!cap.firesWhenSignalIs}, omit quote/line - there's no scoring consequence to back up.`,
   );
 
   const optionalDimension = rubric.dimensions.find((d) => d.optional && d.disableDetectionCriteria);
@@ -63,7 +65,7 @@ DIMENSIONS:
 ${dimensionsText}
 
 CALL-LEVEL SIGNALS:
-Also report these as a single "signals" object, each a plain true/false based on what actually happened in the call:
+Also report these as a single "signals" object, based on what actually happened in the call:
 
 ${signalsText}`;
 }

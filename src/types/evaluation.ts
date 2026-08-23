@@ -52,6 +52,56 @@ export type DimensionEvidence = z.infer<typeof DimensionEvidenceSchema>;
  * Not every field applies to every call type; the unused ones for a given
  * call type are simply ignored by that rubric's cap functions.
  */
+/**
+ * One cap-relevant signal as Stage 1 actually reports it: the boolean fact,
+ * plus an OPTIONAL citation. Citation is only meaningful (and only required
+ * by pipeline/evidenceValidator.ts's validation step) when `value` is the
+ * polarity that would actually fire a cap - see AutomaticCap.firesWhenSignalIs
+ * in types/rubric.ts. The non-firing polarity carries no scoring consequence,
+ * so it isn't held to the same evidence bar - same "default safe" principle
+ * capEngine.ts already applies to a signal that's missing entirely.
+ */
+export const RawSignalSchema = z.object({
+  value: z.boolean(),
+  quote: z.string().optional(),
+  line: z.number().int().positive().optional(),
+});
+export type RawSignal = z.infer<typeof RawSignalSchema>;
+
+/**
+ * Stage 1's raw signals shape - what the model actually returns, citation and
+ * all. Distinct from CallLevelSignals (below), which is the flat, VALIDATED
+ * shape everything downstream of pipeline/evidenceValidator.ts consumes -
+ * scoring/*.ts never sees a citation, only the trusted boolean.
+ */
+export const RawCallLevelSignalsSchema = z.object({
+  // --- kickoff signals ---
+  noFollowUpQuestionsAnywhere: RawSignalSchema.optional(),
+  coachDominatesWithoutEngagement: RawSignalSchema.optional(),
+  clientUnresolvedConfusion: RawSignalSchema.optional(),
+  noNorthStarStatement: RawSignalSchema.optional(),
+
+  // --- coaching signals ---
+  nextCallBookedLive: RawSignalSchema.optional(),
+  longTermVisionConnected: RawSignalSchema.optional(),
+  coachSpeaksOver75PctPassiveClient: RawSignalSchema.optional(),
+  concreteAccountabilityCommitmentPresent: RawSignalSchema.optional(),
+  struggleIgnoredOrAvoided: RawSignalSchema.optional(),
+  noActionStepsEitherParty: RawSignalSchema.optional(),
+
+  /** Not a cap signal (not in any rubric's automaticCaps) - governs D4 disable, not a cap - so it stays a plain boolean, no citation. */
+  movementCoachingDisabled: z.boolean().optional(),
+  movementCoachingDisabledReason: z.string().optional(),
+});
+export type RawCallLevelSignals = z.infer<typeof RawCallLevelSignalsSchema>;
+
+/**
+ * The flat, validated shape everything past pipeline/evidenceValidator.ts
+ * uses (scoring/*.ts, signalConsistency.ts, the Report). Same field names as
+ * RawCallLevelSignals, but every value here has already cleared the citation
+ * check above (or was never a cap-firing value to begin with, or was
+ * flipped to the non-firing default when its citation didn't check out).
+ */
 export const CallLevelSignalsSchema = z.object({
   // --- kickoff signals ---
   noFollowUpQuestionsAnywhere: z.boolean().optional(),
@@ -74,7 +124,7 @@ export type CallLevelSignals = z.infer<typeof CallLevelSignalsSchema>;
 
 export const Stage1OutputSchema = z.object({
   dimensions: z.array(DimensionEvidenceSchema),
-  signals: CallLevelSignalsSchema,
+  signals: RawCallLevelSignalsSchema,
 });
 export type Stage1Output = z.infer<typeof Stage1OutputSchema>;
 

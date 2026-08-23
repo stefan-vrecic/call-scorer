@@ -44,9 +44,24 @@ const TOOL_NAME = "report_evidence";
  * type's rubric doesn't actually define.
  */
 function buildEvidenceToolInputSchema(rubric: RubricContract) {
-  const signalProperties: Record<string, { type: string; description?: string }> = {};
+  // Each cap signal is an object, not a bare boolean - {value, quote?, line?} -
+  // so a cap-firing report can carry the same {line, quote} citation dimension
+  // evidence already does, checked the same way by evidenceValidator.ts. See
+  // stage1Prompt.ts's formatSignals for exactly when quote/line are expected.
+  const signalProperties: Record<string, Record<string, unknown>> = {};
   for (const cap of rubric.automaticCaps) {
-    signalProperties[cap.signal] = { type: "boolean" };
+    signalProperties[cap.signal] = {
+      type: "object",
+      properties: {
+        value: { type: "boolean" },
+        quote: {
+          type: "string",
+          description: "Exact verbatim substring from the cited line - required when value is the polarity that would fire this cap, omitted otherwise.",
+        },
+        line: { type: "integer", description: "Transcript line number for quote." },
+      },
+      required: ["value"],
+    };
   }
   const optionalDimension = rubric.dimensions.find((d) => d.optional && d.disableDetectionCriteria);
   if (optionalDimension) {

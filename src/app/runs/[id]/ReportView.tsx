@@ -64,6 +64,14 @@ interface SignalCorrection {
   reason: string;
 }
 
+interface SignalEvidenceIssue {
+  signal: string;
+  capId: string;
+  reportedValue: boolean;
+  correctedValue: boolean;
+  reason: string;
+}
+
 export interface ReportShape {
   callType: "kickoff" | "coaching";
   model: string;
@@ -76,6 +84,7 @@ export interface ReportShape {
   oneThing: OneThing | null;
   evidenceWarning: boolean;
   signalCorrections: SignalCorrection[];
+  signalEvidenceIssues: SignalEvidenceIssue[];
   brief: string;
   redFlags: string[];
   generatedAt: string;
@@ -169,6 +178,22 @@ export default function ReportView({ report }: { report: ReportShape }) {
           {report.signalCorrections.map((c, i) => (
             <div key={i} className={styles.correctionRow}>
               <strong>{c.signal}</strong> (tied to {c.dimensionId}): reported as <code>{String(c.reportedValue)}</code>, corrected to{" "}
+              <code>{String(c.correctedValue)}</code> &mdash; {c.reason}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {report.signalEvidenceIssues.length > 0 && (
+        <section className={`${styles.card} ${styles.notice}`}>
+          <div className={styles.cardTitle}>⚠️ Unvalidated cap signals corrected</div>
+          <p style={{ marginTop: 0, marginBottom: "0.5rem" }}>
+            A signal that would have triggered a scoring cap had no citation that checked out against the transcript. It was treated as
+            not firing before scoring, the same evidence-or-nothing bar applied to per-dimension evidence.
+          </p>
+          {report.signalEvidenceIssues.map((c, i) => (
+            <div key={i} className={styles.correctionRow}>
+              <strong>{c.signal}</strong> (cap: {c.capId}): reported as <code>{String(c.reportedValue)}</code>, corrected to{" "}
               <code>{String(c.correctedValue)}</code> &mdash; {c.reason}
             </div>
           ))}

@@ -10,7 +10,9 @@
  * are real.
  */
 
-import type { Evidence, CallLevelSignals, Stage1Output } from "@/types/evaluation";
+import type { Evidence, CallLevelSignals, RawCallLevelSignals, Stage1Output } from "@/types/evaluation";
+import type { RubricContract } from "@/types/rubric";
+import type { SignalEvidenceIssue } from "@/types/report";
 import type { IndexedTranscript } from "@/lib/transcript";
 import { getLine } from "@/lib/transcript";
 import { EVIDENCE_WARN_RATE, EVIDENCE_WARN_MIN_COUNT, EVIDENCE_FAIL_RATE, EVIDENCE_FAIL_MIN_COUNT } from "@/config";
@@ -56,8 +58,10 @@ export interface Stage1ValidationSummary {
 
 export interface Stage1ValidationResult {
   dimensions: DimensionValidationResult[];
-  /** Passed through unchanged - call-level signals have no per-citation evidence to validate (known gap, documented separately). */
+  /** Flat, validated signals - see validateCallLevelSignals below. Safe for scoring/*.ts to trust directly. */
   signals: CallLevelSignals;
+  /** Empty when every cap-firing signal had a citation that validated. */
+  signalEvidenceIssues: SignalEvidenceIssue[];
   summary: Stage1ValidationSummary;
 }
 
@@ -124,7 +128,80 @@ function validateDimension(
   };
 }
 
-export function validateStage1Output(output: Stage1Output, transcript: IndexedTranscript): Stage1ValidationResult {
+/**
+ * Closes the gap the header comment on Stage1ValidationResult.signals used to
+ * flag as "known, documented separately": a cap-relevant signal is a bare
+ * model-reported boolean with no citation of its own, unlike per-dimension
+ * evidence, which is checked against the real transcript before anything
+ * downstream trusts it.
+ *
+ * Only the polarity that would actually FIRE a cap (AutomaticCap.
+ * firesWhenSignalIs) is held to that bar - the other polarity has no scoring
+ * consequence, so requiring a citation for it would just be busywork, not a
+ * safety measure (same reasoning capEngine.ts already applies to a signal
+ * that's missing entirely: no consequence, no need to force evidence). A
+ * cap-firing value with a missing or invalid citation is flipped to the
+ * non-firing default and recorded as a SignalEvidenceIssue - visible, not
+ * silent, the same principle as cappedBy/scoreClampReason/SignalCorrection.
+ */
+function validateCallLevelSignals(
+  raw: RawCallLevelSignals,
+  rubric: RubricContract,
+  transcript: IndexedTranscript,
+): { signals: CallLevelSignals; issues: SignalEvidenceIssue[] } {
+  const signals: Record<string, unknown> = {
+    movementCoachingDisabled: raw.movementCoachingDisabled,
+    movementCoachingDisabledReason: raw.movementCoachingDisabledReason,
+  };
+  const issues: SignalEvidenceIssue[] = [];
+
+  for (const cap of rubric.automaticCaps) {
+    const reported = raw[cap.signal as keyof RawCallLevelSignals];
+    if (reported === undefined || typeof reported !== "object") continue; // not reported - capEngine already treats this as "doesn't fire"
+
+    if (reported.value !== cap.firesWhenSignalIs) {
+      // Non-firing polarity - no scoring consequence, no citation required.
+      signals[cap.signal] = reported.value;
+      continue;
+    }
+
+    const correctedValue = !cap.firesWhenSignalIs;
+    if (reported.quote === undefined || reported.line === undefined) {
+      signals[cap.signal] = correctedValue;
+      issues.push({
+        signal: cap.signal,
+        capId: cap.id,
+        reportedValue: reported.value,
+        correctedValue,
+        reason: `reported as ${reported.value} (the value that would fire "${cap.id}") with no citation - an unevidenced cap-firing signal is treated the same as the cap not firing.`,
+      });
+      continue;
+    }
+
+    const result = validateEvidenceItem({ line: reported.line, quote: reported.quote }, transcript);
+    if (!result.valid) {
+      signals[cap.signal] = correctedValue;
+      issues.push({
+        signal: cap.signal,
+        capId: cap.id,
+        reportedValue: reported.value,
+        correctedValue,
+        reason: `reported as ${reported.value} (the value that would fire "${cap.id}") citing line ${reported.line} - but that citation failed validation (${result.reason === "line-out-of-range" ? "the line doesn't exist" : "the quote isn't on that line"}), so it's treated the same as the cap not firing.`,
+      });
+      continue;
+    }
+
+    signals[cap.signal] = reported.value; // validated - trusted as-is
+  }
+
+  return { signals: signals as CallLevelSignals, issues };
+}
+
+export function validateStage1Output(
+  output: Stage1Output,
+  transcript: IndexedTranscript,
+  rubric: RubricContract,
+): Stage1ValidationResult {
   const dimensions = output.dimensions.map((d) => validateDimension(d, transcript));
 
   const allResults = dimensions.flatMap((d) => d.results);
@@ -135,9 +212,12 @@ export function validateStage1Output(output: Stage1Output, transcript: IndexedTr
   const warning = invalidRate >= EVIDENCE_WARN_RATE || invalidEvidence >= EVIDENCE_WARN_MIN_COUNT;
   const fail = invalidRate >= EVIDENCE_FAIL_RATE && invalidEvidence >= EVIDENCE_FAIL_MIN_COUNT;
 
+  const { signals, issues: signalEvidenceIssues } = validateCallLevelSignals(output.signals, rubric, transcript);
+
   return {
     dimensions,
-    signals: output.signals,
+    signals,
+    signalEvidenceIssues,
     summary: { totalEvidence, invalidEvidence, invalidRate, warning, fail },
   };
 }

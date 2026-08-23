@@ -12,7 +12,7 @@
  */
 
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
-import type { Report, ReportDimension, SignalCorrection } from "@/types/report";
+import type { Report, ReportDimension, SignalCorrection, SignalEvidenceIssue } from "@/types/report";
 
 // Deliberately no Font.register call - "Helvetica" is one of the 14 standard
 // PDF fonts react-pdf supports out of the box (with real bold/italic/
@@ -123,6 +123,24 @@ function SignalCorrectionsCard({ corrections }: { corrections: SignalCorrection[
   );
 }
 
+function SignalEvidenceIssuesCard({ issues }: { issues: SignalEvidenceIssue[] }) {
+  if (issues.length === 0) return null;
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Unvalidated cap signals corrected</Text>
+      {issues.map((c, i) => (
+        <View key={i} style={styles.bulletRow}>
+          <Text style={styles.bulletDot}>-</Text>
+          <Text style={styles.bulletText}>
+            {c.signal} (cap: {c.capId}): reported as {String(c.reportedValue)}, corrected to {String(c.correctedValue)} -
+            {" "}{c.reason}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function DimensionBlock({ dim }: { dim: ReportDimension }) {
   return (
     <View style={styles.dim} wrap={false}>
@@ -212,6 +230,7 @@ export function ReportDocument({ report, runId }: { report: Report; runId: strin
         )}
 
         <SignalCorrectionsCard corrections={report.signalCorrections} />
+        <SignalEvidenceIssuesCard issues={report.signalEvidenceIssues} />
 
         {report.redFlags.length > 0 && (
           <View style={styles.card}>
