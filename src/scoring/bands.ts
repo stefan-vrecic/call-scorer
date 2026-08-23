@@ -7,10 +7,19 @@ import type { ScoreBandDefinition } from "@/types/rubric";
  * with D4 active, so this is arithmetically a no-op there; it does real work
  * for a coaching call with D4 disabled, per the rubric's own "report the
  * result on the 100 scale" instruction.
+ *
+ * Rounded to 1 decimal place HERE, the one place this division happens -
+ * without it, a D4-disabled call's /90-derived percentage is a repeating
+ * decimal (77/90*100 = 85.55555555555556) that both the web report and the
+ * PDF interpolate raw with no formatting of their own, so it would otherwise
+ * render exactly that ugly, straight to the coach reading the report. Every
+ * other caller (report.total, oneThing's currentTotal/potentialTotal - see
+ * oneThing.ts, which computes both via this same function) inherits the fix
+ * for free rather than needing its own rounding.
  */
 export function rescaleToHundred(rawTotal: number, maxPossible: number): number {
   if (maxPossible <= 0) return 0;
-  return (rawTotal / maxPossible) * 100;
+  return Math.round((rawTotal / maxPossible) * 1000) / 10;
 }
 
 /**

@@ -99,7 +99,10 @@ test("coaching: D4 disabled derives maxPossible from the other 11 dimensions (90
   const result = applyRubricRules(input);
   assert.equal(result.rawTotal, 76); // 10+7+15+10+10+5+5+3+5+3+3
   assert.equal(result.maxPossible, 90);
-  assert.equal(Math.round((result.total * 100)) / 100, Math.round(((76 / 90) * 100) * 100) / 100);
+  // 76/90*100 = 84.44444444444444... - rescaleToHundred() rounds to 1 decimal
+  // (see bands.ts) specifically so this doesn't render as a repeating decimal
+  // straight to a coach reading the report - assert the clean value directly.
+  assert.equal(result.total, 84.4);
 });
 
 test("coaching: next call not booked live forces D10 to 0, non-recoverable, regardless of Stage 2's raw score", () => {
@@ -120,6 +123,7 @@ test("coaching: next call not booked live forces D10 to 0, non-recoverable, rega
   assert.equal(result.cappedDimensionIds.D10, "next-call-not-booked-live");
   assert.equal(result.maxPossible, 105); // all 12 dims active, derived - not the rubric's stated 100
   assert.equal(result.rawTotal, 100); // 105 raw-maxed, minus D10's 5
-  assert.equal(Math.round(result.total * 100) / 100, Math.round(((100 / 105) * 100) * 100) / 100);
+  // 100/105*100 = 95.23809523809524... - rescaleToHundred() rounds to 1 decimal (see bands.ts).
+  assert.equal(result.total, 95.2);
   assert.equal(result.band, "Elite");
 });
