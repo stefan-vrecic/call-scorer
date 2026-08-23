@@ -8,7 +8,7 @@ Paste a kickoff or coaching call transcript, get it scored against BeaverMind's 
 ## How it works
 
 ```mermaid
-flowchart LR
+flowchart TD
     T["Transcript"] --> S1
     S1["Stage 1 - evidence only<br/>indexed lines, forced tool call<br/><i>bands/points withheld</i>"] -->|"per-dimension evidence<br/>{line, quote}"| EV
     EV["Evidence validator<br/>checks every citation against<br/>the real transcript text"] -->|"invalid citations<br/>stripped"| S2
