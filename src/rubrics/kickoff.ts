@@ -20,6 +20,12 @@ export const kickoffRubric: RubricContract = {
     { name: "At Risk", min: 60, max: 69 },
     { name: "Fail", min: 0, max: 59 },
   ],
+  landingTest: {
+    description:
+      "Every score is based on 3 things: depth (how far the coach goes), clarity (how well it lands), and client response (did it actually land). If it doesn't land, it cannot score Elite - a perfect explanation the client never confirmed is not Elite.",
+    feelings: ["This coach gets me", "I know exactly what to do next", "I trust this process", "I'm excited to start"],
+    notExamples: ["That was informative", "I think I understand"],
+  },
   automaticCaps: [
     {
       id: "no-follow-up-questions",

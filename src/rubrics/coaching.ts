@@ -44,6 +44,11 @@ export const coachingRubric: RubricContract = {
     { name: "At Risk", min: 60, max: 69 },
     { name: "Fail", min: 0, max: 59 },
   ],
+  landingTest: {
+    description:
+      "Three-part test for every score: depth (how far the coach went), clarity (how well it landed), and client response (did it actually land). A perfect explanation the client didn't confirm is not Elite.",
+    feelings: ["this is built for me", "I know exactly what to do", "I trust this process", "my coach is paying attention"],
+  },
   automaticCaps: [
     {
       id: "next-call-not-booked-live",

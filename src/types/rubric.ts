@@ -94,6 +94,25 @@ export interface ScoreBandDefinition {
   max: number;
 }
 
+/**
+ * The rubric's own "Scoring Principles" section states this as a top-level
+ * rule meant to apply to EVERY dimension's score, not just the ones whose own
+ * band criteria happen to mention client reaction. Without this, the model
+ * only sees the client-response test incidentally, wherever a specific
+ * dimension's Elite-band text happens to restate it - which most do, but not
+ * all (e.g. coaching's D6/D7/D10/D12 don't). Kept close to each rubric's own
+ * wording rather than merged into one shared sentence - kickoff's version is
+ * sharper and lists explicit non-examples, coaching's doesn't.
+ */
+export interface LandingTest {
+  /** The "three things every score is judged on" framing, close to the source doc's own wording. */
+  description: string;
+  /** The specific feelings/sentiments a client should leave with - verbatim from the rubric. */
+  feelings: string[];
+  /** What does NOT count as landing, if the rubric states explicit non-examples (kickoff only). */
+  notExamples?: string[];
+}
+
 export interface RubricContract {
   callType: CallType;
   totalPoints: number;
@@ -105,4 +124,5 @@ export interface RubricContract {
   reducedTotalPoints?: number;
   /** Coaching only: true - no interpolation, a score must equal one band's value exactly. */
   discreteOnly?: boolean;
+  landingTest: LandingTest;
 }

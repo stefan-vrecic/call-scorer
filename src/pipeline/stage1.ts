@@ -43,6 +43,23 @@ const TOOL_NAME = "report_evidence";
  * that gap - there's no property for the model to fill in that this call
  * type's rubric doesn't actually define.
  */
+/**
+ * Shared shape for any boolean signal that needs a citation when it's true -
+ * cap signals (see below) and movementCoachingDisabled alike. One place so
+ * the two never drift apart.
+ */
+function rawSignalProperty(quoteDescription: string): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: {
+      value: { type: "boolean" },
+      quote: { type: "string", description: quoteDescription },
+      line: { type: "integer", description: "Transcript line number for quote." },
+    },
+    required: ["value"],
+  };
+}
+
 function buildEvidenceToolInputSchema(rubric: RubricContract) {
   // Each cap signal is an object, not a bare boolean - {value, quote?, line?} -
   // so a cap-firing report can carry the same {line, quote} citation dimension
@@ -50,25 +67,18 @@ function buildEvidenceToolInputSchema(rubric: RubricContract) {
   // stage1Prompt.ts's formatSignals for exactly when quote/line are expected.
   const signalProperties: Record<string, Record<string, unknown>> = {};
   for (const cap of rubric.automaticCaps) {
-    signalProperties[cap.signal] = {
-      type: "object",
-      properties: {
-        value: { type: "boolean" },
-        quote: {
-          type: "string",
-          description: "Exact verbatim substring from the cited line - required when value is the polarity that would fire this cap, omitted otherwise.",
-        },
-        line: { type: "integer", description: "Transcript line number for quote." },
-      },
-      required: ["value"],
-    };
+    signalProperties[cap.signal] = rawSignalProperty(
+      "Exact verbatim substring from the cited line - required when value is the polarity that would fire this cap, omitted otherwise.",
+    );
   }
   const optionalDimension = rubric.dimensions.find((d) => d.optional && d.disableDetectionCriteria);
   if (optionalDimension) {
-    signalProperties.movementCoachingDisabled = { type: "boolean" };
+    signalProperties.movementCoachingDisabled = rawSignalProperty(
+      "Exact verbatim substring from a line supporting the disable decision - required when value is true, omitted when false.",
+    );
     signalProperties.movementCoachingDisabledReason = {
       type: "string",
-      description: "Only meaningful when movementCoachingDisabled is true.",
+      description: "Only meaningful when movementCoachingDisabled.value is true - a short plain-language explanation, shown to the reviewer regardless of citation outcome.",
     };
   }
 

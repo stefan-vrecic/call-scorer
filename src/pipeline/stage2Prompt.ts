@@ -31,6 +31,23 @@ function formatDimension(dimension: DimensionContract, discreteOnly: boolean): s
   return lines.join("\n");
 }
 
+function formatLandingTest(rubric: RubricContract): string {
+  const { description, feelings, notExamples } = rubric.landingTest;
+  const lines = [
+    `CLIENT-LANDING TEST (a Scoring Principle from the rubric itself - apply it to EVERY dimension, not just the ones whose band text happens to mention client reaction):`,
+    description,
+    `Before finalizing each dimension's score, ask whether the client would leave it feeling:`,
+    ...feelings.map((f) => `  - "${f}"`),
+  ];
+  if (notExamples && notExamples.length > 0) {
+    lines.push(`Not: ${notExamples.map((e) => `"${e}"`).join(" / ")}.`);
+  }
+  lines.push(
+    `This is a real ceiling on the score, not a tiebreaker: a technically complete or well-explained moment the client never confirmed landing cannot score Elite on this test alone.`,
+  );
+  return lines.join("\n");
+}
+
 export function buildStage2SystemPrompt(rubric: RubricContract, disabledDimensionIds: string[]): string {
   const disabled = new Set(disabledDimensionIds);
   const scoredDimensions = rubric.dimensions.filter((d) => !disabled.has(d.id));
@@ -42,11 +59,13 @@ This is a ${rubric.callType} call.
 
 SCORING RULES:
 - Base every score and every sentence of reasoning on the evidence you're given for that dimension - never introduce a claim, event, or quote that isn't in the evidence provided to you.
-- When a dimension's evidence is marked insufficientEvidence: true (or the evidence array is empty), you have not been given enough to justify a high score. Score conservatively - at or near the bottom of whatever band the rubric's own language for "not observed" maps to (often Fail or the lowest band). Say so plainly in your reasoning (e.g. "No evidence provided for this dimension"). Do not invent behavior to justify a higher score.
+- When a dimension's evidence is marked insufficientEvidence: true (or the evidence array is empty), you have not been given enough to justify a high score. Score conservatively - the lower tier of the band the evidence actually supports, not a full band lower than that. This is NOT a license to collapse into a lower band entirely: if the call clearly exceeds the criteria of the band below but you can't verify every element of a higher band, stay in that higher band's lower tier - do not drop a full band on missing evidence alone. Say so plainly in your reasoning (e.g. "No evidence provided for this dimension"). Do not invent behavior to justify a higher score.
 - Quote-first reasoning: your reasoning for each dimension should reference the specific evidence you were given, not general impressions.
 - Keep reasoning tight: 1-3 sentences per dimension, not a full paragraph. A reviewer needs the specific evidence-backed justification, not an essay.
 - quickFix: one short, concrete sentence describing what the coach would have needed to do differently to reach full marks on this specific dimension.
 - Your score for each dimension MUST be a value that is actually achievable under that dimension's bands as described below - read the band table for each dimension before scoring it.
+
+${formatLandingTest(rubric)}
 
 For each dimension, report: dimensionId, score (number), reasoning, quickFix.
 

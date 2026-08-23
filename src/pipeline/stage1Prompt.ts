@@ -34,9 +34,10 @@ function formatSignals(rubric: RubricContract): string {
   const optionalDimension = rubric.dimensions.find((d) => d.optional && d.disableDetectionCriteria);
   if (optionalDimension) {
     lines.push(
-      `- movementCoachingDisabled: true ONLY if ALL of the following are absent from the call (report false if even one is present):`,
+      `- movementCoachingDisabled: an object { value, quote, line }. value is true ONLY if ALL of the following are absent from the call (report false if even one is present):`,
       ...optionalDimension.disableDetectionCriteria!.map((c) => `    - ${c}`),
-      `- movementCoachingDisabledReason: if movementCoachingDisabled is true, a short plain-language reason (e.g. "no movement coaching on this call - session was entirely strategy/accountability"). Omit or leave empty if false.`,
+      `  Disabling a dimension is a real consequence - it drops entirely out of scoring. When value is true, you MUST also give quote + line: cite the strongest single piece of transcript text supporting the disable decision, same rules as dimension evidence above. This is checked the same way dimension citations are; an unvalidated or missing citation here means the dimension is scored normally instead, no matter what value says. When value is false, omit quote/line.`,
+      `- movementCoachingDisabledReason: if movementCoachingDisabled.value is true, a short plain-language reason (e.g. "no movement coaching on this call - session was entirely strategy/accountability"). Omit or leave empty if false.`,
     );
   }
 

@@ -89,8 +89,16 @@ export const RawCallLevelSignalsSchema = z.object({
   struggleIgnoredOrAvoided: RawSignalSchema.optional(),
   noActionStepsEitherParty: RawSignalSchema.optional(),
 
-  /** Not a cap signal (not in any rubric's automaticCaps) - governs D4 disable, not a cap - so it stays a plain boolean, no citation. */
-  movementCoachingDisabled: z.boolean().optional(),
+  /**
+   * Not a cap signal (not in any rubric's automaticCaps) - governs whether D4
+   * gets scored at all, not a score cap - but the consequence is bigger than
+   * most caps (an entire dimension, 15/105 of coaching's total, silently
+   * dropped from the report), so it gets the same RawSignalSchema citation
+   * treatment as cap signals, not a bare boolean. movementCoachingDisabledReason
+   * stays separate: that's the model's plain-language explanation shown to a
+   * reviewer regardless of citation outcome, not itself the evidence check.
+   */
+  movementCoachingDisabled: RawSignalSchema.optional(),
   movementCoachingDisabledReason: z.string().optional(),
 });
 export type RawCallLevelSignals = z.infer<typeof RawCallLevelSignalsSchema>;

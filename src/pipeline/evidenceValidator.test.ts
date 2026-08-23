@@ -4,6 +4,7 @@ import { indexTranscript } from "@/lib/transcript";
 import { validateEvidenceItem, validateStage1Output } from "./evidenceValidator";
 import type { Stage1Output } from "@/types/evaluation";
 import { kickoffRubric } from "@/rubrics/kickoff";
+import { coachingRubric } from "@/rubrics/coaching";
 
 const transcript = indexTranscript(
   [
@@ -190,13 +191,51 @@ test("a signal Stage 1 didn't report at all stays absent - unaffected by the new
   assert.equal(result.signalEvidenceIssues.length, 0);
 });
 
-test("movementCoachingDisabled/Reason are not cap signals - pass through unvalidated, unchanged", () => {
+// --- movementCoachingDisabled: not a cap, but same citation bar (dropping a
+// whole dimension is a bigger consequence than most caps) ---
+
+test("movementCoachingDisabled=true with a valid citation: trusted, reason passed through unvalidated", () => {
   const output: Stage1Output = {
     dimensions: [],
-    signals: { movementCoachingDisabled: true, movementCoachingDisabledReason: "no movement coaching on this call" },
+    signals: {
+      movementCoachingDisabled: { value: true, quote: "Hey, is this Owen?", line: 1 },
+      movementCoachingDisabledReason: "no movement coaching on this call",
+    },
   };
-  const result = validateStage1Output(output, transcript, kickoffRubric);
+  const result = validateStage1Output(output, transcript, coachingRubric);
   assert.equal(result.signals.movementCoachingDisabled, true);
   assert.equal(result.signals.movementCoachingDisabledReason, "no movement coaching on this call");
+  assert.equal(result.signalEvidenceIssues.length, 0);
+});
+
+test("movementCoachingDisabled=true with NO citation: flipped to false (D4 scores normally), issue recorded", () => {
+  const output: Stage1Output = {
+    dimensions: [],
+    signals: { movementCoachingDisabled: { value: true }, movementCoachingDisabledReason: "no movement coaching on this call" },
+  };
+  const result = validateStage1Output(output, transcript, coachingRubric);
+  assert.equal(result.signals.movementCoachingDisabled, false);
+  assert.equal(result.signalEvidenceIssues.length, 1);
+  assert.equal(result.signalEvidenceIssues[0].signal, "movementCoachingDisabled");
+  // The reason is still passed through even when the disable itself gets reverted -
+  // a reviewer can see what the model claimed, even though D4 is being scored anyway.
+  assert.equal(result.signals.movementCoachingDisabledReason, "no movement coaching on this call");
+});
+
+test("movementCoachingDisabled=true with a citation that fails validation: flipped, issue recorded", () => {
+  const output: Stage1Output = {
+    dimensions: [],
+    signals: { movementCoachingDisabled: { value: true, quote: "completely fabricated quote", line: 1 } },
+  };
+  const result = validateStage1Output(output, transcript, coachingRubric);
+  assert.equal(result.signals.movementCoachingDisabled, false);
+  assert.equal(result.signalEvidenceIssues.length, 1);
+  assert.equal(result.signalEvidenceIssues[0].capId, "movement-coaching-disabled");
+});
+
+test("movementCoachingDisabled=false requires no citation - passes through untouched", () => {
+  const output: Stage1Output = { dimensions: [], signals: { movementCoachingDisabled: { value: false } } };
+  const result = validateStage1Output(output, transcript, coachingRubric);
+  assert.equal(result.signals.movementCoachingDisabled, false);
   assert.equal(result.signalEvidenceIssues.length, 0);
 });

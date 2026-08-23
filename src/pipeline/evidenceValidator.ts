@@ -144,55 +144,81 @@ function validateDimension(
  * non-firing default and recorded as a SignalEvidenceIssue - visible, not
  * silent, the same principle as cappedBy/scoreClampReason/SignalCorrection.
  */
+/**
+ * One signal's worth of the check above - shared by automaticCaps AND
+ * movementCoachingDisabled (below), which needs the exact same treatment:
+ * a real consequence (a whole dimension dropped from scoring) riding on an
+ * otherwise-bare boolean. Returns undefined when the signal wasn't reported
+ * at all (nothing to validate, downstream already treats missing as safe).
+ */
+function validateFiringSignal(
+  signalName: string,
+  capId: string,
+  reported: unknown,
+  firesWhenSignalIs: boolean,
+  transcript: IndexedTranscript,
+  issues: SignalEvidenceIssue[],
+): boolean | undefined {
+  if (reported === undefined || typeof reported !== "object") return undefined;
+  const { value, quote, line } = reported as { value: boolean; quote?: string; line?: number };
+
+  if (value !== firesWhenSignalIs) {
+    return value; // non-firing polarity - no scoring consequence, no citation required
+  }
+
+  const correctedValue = !firesWhenSignalIs;
+  if (quote === undefined || line === undefined) {
+    issues.push({
+      signal: signalName,
+      capId,
+      reportedValue: value,
+      correctedValue,
+      reason: `reported as ${value} (the value that would fire "${capId}") with no citation - an unevidenced signal is treated the same as not firing.`,
+    });
+    return correctedValue;
+  }
+
+  const result = validateEvidenceItem({ line, quote }, transcript);
+  if (!result.valid) {
+    issues.push({
+      signal: signalName,
+      capId,
+      reportedValue: value,
+      correctedValue,
+      reason: `reported as ${value} (the value that would fire "${capId}") citing line ${line} - but that citation failed validation (${result.reason === "line-out-of-range" ? "the line doesn't exist" : "the quote isn't on that line"}), so it's treated the same as not firing.`,
+    });
+    return correctedValue;
+  }
+
+  return value; // validated - trusted as-is
+}
+
 function validateCallLevelSignals(
   raw: RawCallLevelSignals,
   rubric: RubricContract,
   transcript: IndexedTranscript,
 ): { signals: CallLevelSignals; issues: SignalEvidenceIssue[] } {
   const signals: Record<string, unknown> = {
-    movementCoachingDisabled: raw.movementCoachingDisabled,
     movementCoachingDisabledReason: raw.movementCoachingDisabledReason,
   };
   const issues: SignalEvidenceIssue[] = [];
 
   for (const cap of rubric.automaticCaps) {
-    const reported = raw[cap.signal as keyof RawCallLevelSignals];
-    if (reported === undefined || typeof reported !== "object") continue; // not reported - capEngine already treats this as "doesn't fire"
-
-    if (reported.value !== cap.firesWhenSignalIs) {
-      // Non-firing polarity - no scoring consequence, no citation required.
-      signals[cap.signal] = reported.value;
-      continue;
-    }
-
-    const correctedValue = !cap.firesWhenSignalIs;
-    if (reported.quote === undefined || reported.line === undefined) {
-      signals[cap.signal] = correctedValue;
-      issues.push({
-        signal: cap.signal,
-        capId: cap.id,
-        reportedValue: reported.value,
-        correctedValue,
-        reason: `reported as ${reported.value} (the value that would fire "${cap.id}") with no citation - an unevidenced cap-firing signal is treated the same as the cap not firing.`,
-      });
-      continue;
-    }
-
-    const result = validateEvidenceItem({ line: reported.line, quote: reported.quote }, transcript);
-    if (!result.valid) {
-      signals[cap.signal] = correctedValue;
-      issues.push({
-        signal: cap.signal,
-        capId: cap.id,
-        reportedValue: reported.value,
-        correctedValue,
-        reason: `reported as ${reported.value} (the value that would fire "${cap.id}") citing line ${reported.line} - but that citation failed validation (${result.reason === "line-out-of-range" ? "the line doesn't exist" : "the quote isn't on that line"}), so it's treated the same as the cap not firing.`,
-      });
-      continue;
-    }
-
-    signals[cap.signal] = reported.value; // validated - trusted as-is
+    const value = validateFiringSignal(cap.signal, cap.id, raw[cap.signal as keyof RawCallLevelSignals], cap.firesWhenSignalIs, transcript, issues);
+    if (value !== undefined) signals[cap.signal] = value;
   }
+
+  // Not a cap (not in rubric.automaticCaps), so it needs its own call - same
+  // "cite the firing polarity" bar, just outside the caps loop above.
+  const movementCoachingDisabled = validateFiringSignal(
+    "movementCoachingDisabled",
+    "movement-coaching-disabled",
+    raw.movementCoachingDisabled,
+    true,
+    transcript,
+    issues,
+  );
+  if (movementCoachingDisabled !== undefined) signals.movementCoachingDisabled = movementCoachingDisabled;
 
   return { signals: signals as CallLevelSignals, issues };
 }
