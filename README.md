@@ -1,6 +1,6 @@
 # Call Scorer
 
-Paste a kickoff or coaching call transcript, get it scored against BeaverMind's rubric (12 dimensions per call type, evidence checked before anything gets scored) and turned into a shareable report - total, band, "the one thing" to improve, red flags, and a downloadable PDF.
+Paste a kickoff or coaching call transcript to get an evidence-backed score against BeaverMind's rubric, plus a shareable report, improvement priority, red flags, and downloadable PDF.
 
 **Live:** https://call-scorer-inky.vercel.app
 **Source spec** (reference only): [hiring-ai-dev-exercise](https://github.com/lukecala/hiring-ai-dev-exercise)
@@ -9,80 +9,76 @@ Paste a kickoff or coaching call transcript, get it scored against BeaverMind's 
 
 ```mermaid
 flowchart TD
-    T["Transcript"] --> S1
-    S1["Stage 1 - evidence only<br/>indexed lines, forced tool call<br/><i>bands/points withheld</i>"] -->|"per-dimension evidence<br/>{line, quote}"| EV
-    EV["Evidence validator<br/>checks every citation against<br/>the real transcript text"] -->|"invalid citations<br/>stripped"| S2
-    S2["Stage 2 - scoring<br/>full rubric + validated<br/>evidence only<br/><i>never sees raw transcript again</i>"] -->|"score + reasoning<br/>+ quick fix"| DR
-    DR["Deterministic rules (code)<br/>caps · total · band<br/>one-thing simulation"] -->|"final scored report"| SY
-    SY["Synthesis<br/>brief + red flags<br/><i>cannot alter any score/cap</i>"] --> R
-
-    R["Final report"] --> DB[("Supabase")]
-    R --> UI["Web report + PDF"]
+    T[Transcript] --> E[Evidence extraction]
+    E --> V[Validate citations]
+    V --> S[Score validated evidence]
+    S --> R[Apply rules in code]
+    R --> Y[Write report summary]
+    Y --> F[Final report]
+    F --> DB[(Supabase)]
+    F --> O[Web report + PDF]
 
     classDef llm fill:#eaf3fb,stroke:#1a5f9e,color:#1a5f9e;
     classDef code fill:#eafaf1,stroke:#1e7e46,color:#1e7e46;
     classDef data fill:#f2f2f2,stroke:#888,color:#333;
-    class S1,S2,SY llm;
-    class EV,DR code;
-    class T,R,DB,UI data;
+    class E,S,Y llm;
+    class V,R code;
+    class T,F,DB,O data;
 ```
 
-Blue = LLM call, green = deterministic code - evidence-checking, caps, totals, and the "one thing" pick are all code, never model judgment.
+Blue = LLM call, green = deterministic code.
 
-1. **Stage 1 - evidence only.** The transcript is indexed into numbered lines; a forced tool call extracts each dimension's observed behaviour plus cited `{line, quote}` evidence. No scoring yet, and the rubric's bands/points are deliberately withheld so early observation isn't anchored toward a score.
-2. **Evidence validator.** Every citation is checked against the actual transcript text at that line. Anything that doesn't match is stripped before it ever reaches scoring - "evidence or nothing," enforced in code, not just prompted for.
-3. **Stage 2 - scoring.** A second call sees the full rubric (bands, points, calibration notes) plus only the *validated* evidence - never the raw transcript again - and scores each dimension with a quick fix.
-4. **Deterministic rules - plain code, not the model.** Applies each rubric's automatic-cap table, computes the total and band, and figures out "the one thing" by simulating maxing each dimension (lifting any cap it would clear) and picking the largest score delta.
-5. **Synthesis.** A small, strictly downstream call turns the already-final structured result into a brief + red flags. It cannot change a score, a cap, or the one-thing selection - only describe what's already decided.
+1. **Extract evidence.** The transcript is indexed into numbered lines. A model identifies behaviour for each dimension and supplies `{ line, quote }` citations; scoring guidance is withheld at this stage.
+2. **Validate it.** Code compares every citation with the real transcript text and removes anything that does not match.
+3. **Score only verified evidence.** A separate model receives the rubric and the validated evidence—not the raw transcript—and produces dimension scores and quick fixes.
+4. **Apply rules deterministically.** Code applies rubric caps, calculates totals and bands, and selects the highest-impact improvement.
+5. **Create the summary.** A final, downstream model call writes the brief and red flags from the completed result. It cannot change scores, caps, or the selected improvement.
 
-Persistence is Supabase (RLS on, zero policies - only the server-side `service_role` key can touch it), the pipeline runs server-side after the initial response via Next's `after()` (closing the tab doesn't stop it), and the model is `claude-sonnet-5` (`src/config.ts`).
+The pipeline runs server-side after the initial response, so closing the tab doesn't stop it, and the finished report is persisted to Supabase for the shareable link.
 
-## Environment setup
+## Setup
 
-The app won't boot without this - `src/lib/supabase.ts` throws on startup if either Supabase variable is missing, and every pipeline call needs a real Anthropic key. Create `.env.local` in the project root:
+Create `.env.local` in the project root:
 
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Supabase → Project Settings → API
+# Supabase -> Project Settings -> API
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=<service_role secret, not anon>
+SUPABASE_SERVICE_ROLE_KEY=<service_role secret>
 ```
 
-`SUPABASE_SERVICE_ROLE_KEY` is intentionally the `service_role` key, not `anon` - the `runs` table has RLS enabled with zero policies, so this is the only key that can read/write it at all. Never expose this key to the client; every Supabase access goes through `src/lib/supabase.ts` on the server only.
+Apply [`db/schema.sql`](./db/schema.sql) once in the SQL Editor for that Supabase project. The script is idempotent, so it is safe to run again.
 
-Then, against that same Supabase project, apply the schema once (SQL Editor, paste the contents of `db/schema.sql`, run). It's idempotent (`create table if not exists`, etc.) so re-running it later is harmless.
+`SUPABASE_SERVICE_ROLE_KEY` is server-only. The `runs` table has RLS enabled with no public policies, so the browser cannot read or write evaluation data directly.
 
-## Getting started
+## Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000), paste (or drag/drop, or open from folder) a kickoff or coaching call transcript, and submit - or use the CLI scripts to run a specific stage without going through the UI/DB at all:
+Open [http://localhost:3000](http://localhost:3000), then paste, drop, or select a kickoff or coaching transcript.
 
 ```bash
-npm test                                                          # unit tests (43 currently)
-npm run stage1 -- <kickoff|coaching> <path-to-transcript.txt>     # Stage 1 evidence extraction only
-npm run validate                                                  # re-check saved dev-output/ against the real transcripts, no API cost
-npm run pipeline -- <kickoff|coaching> <path-to-transcript.txt>   # full pipeline end to end, prints the report, no DB write
+npm test
+npm run stage1 -- <kickoff|coaching> <path-to-transcript.txt>
+npm run validate
+npm run pipeline -- <kickoff|coaching> <path-to-transcript.txt>
 ```
 
-## Architecture & key decisions
+`stage1` runs evidence extraction only; `validate` rechecks saved output without an API call; `pipeline` runs the full workflow without writing to the database.
 
-- **Evidence is checked in code, not just prompted for.** Stage 1's citations are verified against the actual transcript before Stage 2 ever sees them; anything that doesn't match is dropped, not silently trusted.
-- **Scoring is deterministic.** Caps, totals, bands, and "the one thing to improve" are all plain code (`applyRubricRules`, `computeOneThing`) - the model never self-applies a rule, it only reasons and writes prose.
-- **Found and fixed a real inconsistency in the client's own rubric doc**: coaching's 12 dimensions sum to 105 points, not the 100/85 its own scope note claims. `maxPossible` is derived from the actual dimensions, not the stated totals.
-- **The strongest bug of the build**: a Stage 1 call-level signal contradicted its own dimension's validated evidence, wrongly zeroing a real 5/5. Fixed with a deterministic correction that only trusts *validated* evidence - never a bare, unverified claim.
-- **A bug only a live deployment could find**: a 60-second function timeout that 4 phases of thorough local testing never tripped, caught the first time a run actually needed a retry in production. Fixed and reverified live.
-- **No auth, by design** - Supabase RLS is on with zero policies (only the server's service-role key can touch the data); sharing is by URL, matching "send this link to a colleague."
-- **Split model choice.** Stage 1 (evidence) and Stage 2 (scoring) run on Sonnet - that's what's actually being graded. Synthesis (brief/red flags) is strictly downstream of already-final data (can't touch a score or citation, see `src/pipeline/synthesis.ts`), so it runs on the cheaper Haiku with no accuracy exposure - `src/config.ts`.
-- **Cap signals are evidence-checked too, not just dimensions - with one honest limit.** A cap-firing signal needs a citation that's real, verified transcript text, closing the gap where a bare boolean could fire a cap on nothing. For the ~half of caps that assert something never happened across the whole call ("no follow-up questions anywhere"), a single citation can point at real supporting text but can't mathematically prove a negative - a structural limit of citing evidence for an absence, not a bug. Verified live: both real cap-firing cases checked fired correctly with a genuine (not fabricated) citation attached.
-- **A failed run shows a plain, reassuring message first** - the raw underlying error (an SDK error, a network failure) is real and preserved, just tucked behind a "Technical details" toggle rather than being the first thing a reviewer sees on a shared link.
-- **Deliberately out of scope**: concurrent double-submit races, and transcript formats other than the exercise's own `[Speaker]: text` shape.
-- Every decision above was verified against real transcripts and a real deployment, not mocked - see [`ENGINEERING_LOG.md`](./ENGINEERING_LOG.md) for the full phase-by-phase record: every bug, every trade-off considered and rejected, and exactly how each fix was proven.
+## Design choices
 
----
+- **Evidence before scoring.** A citation must match the transcript before it can influence a score - dimension evidence and cap-triggering signals alike. One honest limit: a citation can prove something happened, not that something never happened across a whole call - documented in [`ENGINEERING_LOG.md`](./ENGINEERING_LOG.md) rather than glossed over.
+- **Rules stay in code.** Automatic caps, totals, bands, and the recommended improvement are deterministic—not model judgment.
+- **Protected persistence.** Supabase is accessed only from server code using the service-role key; unauthenticated browser access is blocked by RLS.
+- **Purpose-fit model use.** Sonnet handles evidence extraction and scoring; the cheaper Haiku model only produces the downstream report prose.
+- **Rubric totals are derived from dimensions.** Coaching dimensions total 105 points despite conflicting numbers in the source scope note, so the app calculates the maximum from the actual rubric.
+- **Caught by a system built to distrust the model.** A Stage 1 signal once contradicted its own dimension's validated evidence and wrongly zeroed a real score - fixed with a deterministic check that only trusts validated evidence, never a bare claim.
+- **A bug only a live deployment could catch.** A function timeout that four phases of local-only testing never tripped, found and fixed against real production latency.
+- **Deliberately out of scope:** concurrent double-submit races, and transcript formats other than the exercise's own `[Speaker]: text` shape.
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+For detailed implementation notes, trade-offs, and validation history, see [`ENGINEERING_LOG.md`](./ENGINEERING_LOG.md).
