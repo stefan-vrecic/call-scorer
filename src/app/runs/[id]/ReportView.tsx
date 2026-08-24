@@ -184,7 +184,7 @@ export default function ReportView({ report }: { report: ReportShape }) {
         </section>
       )}
 
-      {report.signalEvidenceIssues.length > 0 && (
+      {(report.signalEvidenceIssues ?? []).length > 0 && (
         <section className={`${styles.card} ${styles.notice}`}>
           <div className={styles.cardTitle}>⚠️ Unvalidated cap signals corrected</div>
           <p style={{ marginTop: 0, marginBottom: "0.5rem" }}>
