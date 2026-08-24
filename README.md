@@ -73,15 +73,27 @@ npm run pipeline -- <kickoff|coaching> <path-to-transcript.txt>
 ## Design choices
 
 - **Evidence before scoring.** A citation must match the transcript before it can influence a score - dimension evidence and cap-triggering signals alike. One honest limit: a citation can prove something happened, not that something never happened across a whole call - documented in [`ENGINEERING_LOG.md`](./ENGINEERING_LOG.md) rather than glossed over.
+
 - **Rules stay in code.** Automatic caps, totals, bands, and the recommended improvement are deterministic—not model judgment.
+
 - **Protected persistence.** Supabase is accessed only from server code using the service-role key; unauthenticated browser access is blocked by RLS.
+
 - **Purpose-fit model use.** Sonnet handles evidence extraction and scoring; the cheaper Haiku model only produces the downstream report prose.
+
 - **Rubric totals are derived from dimensions.** Coaching dimensions total 105 points despite conflicting numbers in the source scope note, so the app calculates the maximum from the actual rubric.
+
 - **Caught by a system built to distrust the model.** A Stage 1 signal once contradicted its own dimension's validated evidence and wrongly zeroed a real score - fixed with a deterministic check that only trusts validated evidence, never a bare claim.
+
 - **A bug only a live deployment could catch.** A function timeout that four phases of local-only testing never tripped, found and fixed against real production latency.
+
 - **A bug found by reading the spec's "taste" requirement literally.** Actually rendering a real PDF, not just trusting the code, surfaced `85.55555555555556 / 100` on a D4-disabled coaching call - a repeating decimal from an unrounded rescale, never caught because most spot-checked runs don't rescale at all. Fixed at the one source function; every consumer inherits it.
+
 - **The rubric's own "Scoring Principles" are wired into the prompt, checked against the source doc, not just the per-dimension tables.** Both rubrics state a cross-dimension client-feelings test - checked whether it actually reached the model and found it didn't; now it's rendered explicitly per rubric, alongside kickoff's more specific "don't collapse a full band" missing-evidence nuance.
+
 - **`movementCoachingDisabled` gets the same evidence bar as any cap now.** It used to be the one significant model decision with zero citation-checking despite dropping an entire dimension from scoring - closed the same way Phase 11 closed it for caps, not with a manual override.
+
+- **A later review found the same class of gap generalizes further, and it's documented rather than rushed.** 9 of the app's 10 cap signals still have no citation check on their "safe" value - Phase 11 only closed this for the one signal a real bug forced it on. Four smaller gaps found alongside it. See [`ENGINEERING_LOG.md`](./ENGINEERING_LOG.md) Phase 14 for what was found and why each was left for a deliberate fix instead of a rushed one.
+
 - **Deliberately out of scope:** concurrent double-submit races, and transcript formats other than the exercise's own `[Speaker]: text` shape.
 
 For detailed implementation notes, trade-offs, and validation history, see [`ENGINEERING_LOG.md`](./ENGINEERING_LOG.md).
